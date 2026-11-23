@@ -1,11 +1,11 @@
 import { useState, useEffect } from 'react';
-import { History, Search, ShieldCheck, Loader2 } from 'lucide-react';
+import { History, Search, ShieldCheck, Loader2, Users } from 'lucide-react';
 import toast from 'react-hot-toast';
 import Layout from '../../components/Layout';
 import api from '../../api/axios';
 
 const MODULE_BADGE = {
-  Authentication: 'bg-blue-100 text-blue-800',
+  Authentication: 'bg-teal-100 text-teal-800',
   'Repair Requests': 'bg-teal-100 text-teal-800',
   'Billing & Payments': 'bg-emerald-100 text-emerald-800',
   Account: 'bg-amber-100 text-amber-800',
@@ -16,6 +16,7 @@ const ActivityLogs = () => {
   const [loading, setLoading] = useState(true);
   const [searchQuery, setSearchQuery] = useState('');
   const [moduleFilter, setModuleFilter] = useState('ALL');
+  const [roleFilter, setRoleFilter] = useState('ALL');
 
   useEffect(() => {
     const fetchLogs = async () => {
@@ -33,6 +34,9 @@ const ActivityLogs = () => {
 
   const filteredLogs = logs.filter((log) => {
     const matchesModule = moduleFilter === 'ALL' || log.system_module === moduleFilter;
+    const matchesRole =
+      roleFilter === 'ALL' ||
+      (log.actor_role || '').toLowerCase() === roleFilter.toLowerCase();
     const term = searchQuery.toLowerCase();
     const matchesSearch =
       !term ||
@@ -40,7 +44,7 @@ const ActivityLogs = () => {
       log.event_action?.toLowerCase().includes(term) ||
       log.event_description?.toLowerCase().includes(term);
 
-    return matchesModule && matchesSearch;
+    return matchesModule && matchesRole && matchesSearch;
   });
 
   const formatTimestamp = (ts) => {
@@ -71,33 +75,49 @@ const ActivityLogs = () => {
           </div>
         </div>
 
-        {/* Search & Module Filter */}
-        <div className="flex flex-col gap-3 rounded-xl border border-stone-200 bg-white p-4 shadow-sm sm:flex-row">
-          <div className="relative flex-1">
+        {/* ── Search & Filters ──────────────────────────────────── */}
+        <div className="flex flex-col gap-3 rounded-2xl border border-stone-200 bg-white p-4 shadow-sm sm:flex-row sm:flex-wrap">
+          {/* Search */}
+          <div className="relative min-w-48 flex-1">
             <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-stone-400" />
             <input
               type="text"
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
               placeholder="Search by user, action, or description..."
-              className="w-full rounded-lg border border-stone-300 py-2 pl-9 pr-3 text-sm focus:border-teal-600 focus:outline-none"
+              className="w-full rounded-xl border border-stone-300 py-2 pl-9 pr-3 text-sm focus:border-teal-600 focus:outline-none"
             />
           </div>
 
+          {/* Module Filter */}
           <select
             value={moduleFilter}
             onChange={(e) => setModuleFilter(e.target.value)}
-            className="rounded-lg border border-stone-300 bg-white px-3 py-2 text-sm text-stone-700 focus:border-teal-600 focus:outline-none"
+            className="rounded-xl border border-stone-300 bg-white px-3 py-2 text-sm text-stone-700 focus:border-teal-600 focus:outline-none"
           >
-            <option value="ALL">All System Modules</option>
+            <option value="ALL">All Modules</option>
             <option value="Authentication">Authentication</option>
             <option value="Repair Requests">Repair Requests</option>
             <option value="Billing & Payments">Billing & Payments</option>
             <option value="Account">Account</option>
           </select>
+
+          {/* Role Filter */}
+          <div className="flex items-center gap-2 rounded-xl border border-stone-300 bg-white px-3 py-2">
+            <Users className="h-4 w-4 text-teal-600 shrink-0" />
+            <select
+              value={roleFilter}
+              onChange={(e) => setRoleFilter(e.target.value)}
+              className="bg-transparent text-sm text-stone-700 focus:outline-none"
+            >
+              <option value="ALL">All Users</option>
+              <option value="admin">Admin Only</option>
+              <option value="customer">Customer Only</option>
+            </select>
+          </div>
         </div>
 
-        {/* Logs Table */}
+        {/* ── Logs Table ────────────────────────────────────────── */}
         <div className="overflow-hidden rounded-2xl border border-stone-200 bg-white shadow-sm">
           {loading ? (
             <div className="flex h-52 items-center justify-center">
@@ -121,16 +141,22 @@ const ActivityLogs = () => {
                 </thead>
                 <tbody className="divide-y divide-stone-100">
                   {filteredLogs.map((log) => (
-                    <tr key={log.audit_id} className="hover:bg-stone-50/70">
+                    <tr key={log.audit_id} className="transition hover:bg-teal-50/30">
                       <td className="whitespace-nowrap px-4 py-3.5 text-xs text-stone-500">
                         <span className="inline-flex items-center gap-1.5">
-                          <History className="h-3.5 w-3.5 text-stone-400" />
+                          <History className="h-3.5 w-3.5 text-stone-300" />
                           {formatTimestamp(log.logged_at)}
                         </span>
                       </td>
                       <td className="px-4 py-3.5">
                         <span className="font-semibold text-stone-900">{log.actor_name}</span>
-                        <span className="ml-1.5 rounded bg-stone-100 px-1.5 py-0.5 text-[10px] font-bold uppercase text-stone-600">
+                        <span
+                          className={`ml-1.5 rounded-md px-1.5 py-0.5 text-[10px] font-bold uppercase ${
+                            (log.actor_role || '').toLowerCase() === 'admin'
+                              ? 'bg-teal-100 text-teal-700'
+                              : 'bg-stone-100 text-stone-600'
+                          }`}
+                        >
                           {log.actor_role}
                         </span>
                       </td>

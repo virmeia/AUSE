@@ -11,12 +11,27 @@ import {
   FileText,
   XCircle,
   Loader2,
+  Sparkles,
 } from 'lucide-react';
 import toast from 'react-hot-toast';
 import Layout from '../../components/Layout';
 import StatusBadge from '../../components/StatusBadge';
 import { useAuth } from '../../context/AuthContext';
 import api from '../../api/axios';
+
+/* Status → left-border accent color */
+const STATUS_BORDER = {
+  Pending:        'border-l-amber-400',
+  Quoted:         'border-l-purple-500',
+  'Quote Approved': 'border-l-blue-400',
+  'Quote Rejected': 'border-l-red-400',
+  Scheduled:      'border-l-cyan-400',
+  'In Progress':  'border-l-teal-400',
+  Approved:       'border-l-teal-500',
+  Completed:      'border-l-emerald-500',
+  Rejected:       'border-l-red-500',
+  Cancelled:      'border-l-stone-400',
+};
 
 const CustomerDashboard = () => {
   const { user } = useAuth();
@@ -29,7 +44,7 @@ const CustomerDashboard = () => {
     try {
       const { data } = await api.get('/requests/my-requests');
       setRequests(data);
-    } catch (error) {
+    } catch {
       toast.error('Failed to load your repair requests.');
     } finally {
       setLoading(false);
@@ -45,9 +60,7 @@ const CustomerDashboard = () => {
       !window.confirm(
         `Are you sure you want to cancel your ${applianceType} repair request?`
       )
-    ) {
-      return;
-    }
+    ) return;
 
     setCancellingId(requestId);
     try {
@@ -63,21 +76,17 @@ const CustomerDashboard = () => {
     }
   };
 
-  // Derived KPI counts
-  const totalRequests = requests.length;
+  const totalRequests    = requests.length;
   const actionNeededCount = requests.filter((r) => r.status === 'Quoted').length;
-  const activeCount = requests.filter((r) =>
-    ['Pending', 'Approved', 'Quoted', 'Quote Approved', 'Scheduled', 'In Progress'].includes(
-      r.status
-    )
+  const activeCount       = requests.filter((r) =>
+    ['Pending', 'Approved', 'Quoted', 'Quote Approved', 'Scheduled', 'In Progress'].includes(r.status)
   ).length;
-  const completedCount = requests.filter((r) => r.status === 'Completed').length;
+  const completedCount   = requests.filter((r) => r.status === 'Completed').length;
 
   const filteredRequests = requests.filter((req) => {
-    if (filterStatus === 'ALL') return true;
-    if (filterStatus === 'ACTION') return req.status === 'Quoted';
-    if (filterStatus === 'ACTIVE')
-      return !['Completed', 'Rejected', 'Quote Rejected', 'Cancelled'].includes(req.status);
+    if (filterStatus === 'ALL')       return true;
+    if (filterStatus === 'ACTION')    return req.status === 'Quoted';
+    if (filterStatus === 'ACTIVE')    return !['Completed', 'Rejected', 'Quote Rejected', 'Cancelled'].includes(req.status);
     if (filterStatus === 'COMPLETED') return req.status === 'Completed';
     return true;
   });
@@ -85,44 +94,61 @@ const CustomerDashboard = () => {
   const formatDate = (dateString) => {
     if (!dateString) return '—';
     return new Date(dateString).toLocaleDateString('en-US', {
-      month: 'short',
-      day: 'numeric',
-      year: 'numeric',
+      month: 'short', day: 'numeric', year: 'numeric',
     });
   };
+
+  const firstName = user?.full_name?.split(' ')[0] ?? 'there';
 
   return (
     <Layout>
       <div className="mx-auto max-w-6xl space-y-6">
-        {/* Header */}
-        <div className="flex flex-col justify-between gap-4 sm:flex-row sm:items-center">
-          <div>
-            <h1 className="text-2xl font-bold text-stone-900">
-              Welcome back, {user?.full_name?.split(' ')[0]}!
-            </h1>
-            <p className="mt-1 text-sm text-stone-500">
-              Track your home appliance repairs, approve quotations, and view visit schedules.
-            </p>
-          </div>
 
-          <Link
-            to="/customer/new-request"
-            className="inline-flex items-center justify-center gap-2 rounded-xl bg-teal-600 px-4 py-2.5 text-sm font-semibold text-white shadow-sm transition hover:bg-teal-700"
-          >
-            <PlusCircle className="h-4 w-4" />
-            New Repair Request
-          </Link>
+        {/* ── Welcome Banner ───────────────────────────────────── */}
+        <div className="relative overflow-hidden rounded-2xl bg-gradient-to-br from-teal-700 via-teal-600 to-emerald-600 p-6 shadow-lg">
+          {/* Decorative dot grid */}
+          <div
+            className="absolute inset-0 opacity-10"
+            style={{
+              backgroundImage: 'radial-gradient(circle, #fff 1px, transparent 1px)',
+              backgroundSize: '20px 20px',
+            }}
+          />
+          <div className="absolute -top-8 -right-8 h-40 w-40 rounded-full bg-teal-500/20 blur-2xl" />
+
+          <div className="relative flex flex-col justify-between gap-4 sm:flex-row sm:items-center">
+            <div>
+              <div className="flex items-center gap-2 text-teal-200 text-xs font-semibold mb-1">
+                <Sparkles className="h-3.5 w-3.5" />
+                Customer Portal
+              </div>
+              <h1 className="text-2xl font-extrabold text-white leading-tight">
+                Welcome back, {firstName}!
+              </h1>
+              <p className="mt-1 text-sm text-teal-100/80">
+                Track repairs, approve quotations, and view your visit schedule.
+              </p>
+            </div>
+            <Link
+              to="/customer/new-request"
+              className="inline-flex shrink-0 items-center justify-center gap-2 rounded-xl bg-white px-5 py-2.5 text-sm font-bold text-teal-700 shadow-sm transition hover:bg-teal-50"
+            >
+              <PlusCircle className="h-4 w-4" />
+              New Repair Request
+            </Link>
+          </div>
         </div>
 
-        {/* Pending Quote Action Banner */}
+        {/* ── Quote Action Banner ──────────────────────────────── */}
         {actionNeededCount > 0 && (
           <div className="flex flex-col justify-between gap-3 rounded-xl border border-purple-200 bg-purple-50 p-4 sm:flex-row sm:items-center">
             <div className="flex items-start gap-3">
-              <FileText className="mt-0.5 h-5 w-5 shrink-0 text-purple-600" />
+              <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-purple-100">
+                <FileText className="h-4 w-4 text-purple-600" />
+              </div>
               <div>
                 <p className="text-sm font-semibold text-purple-900">
-                  You have {actionNeededCount} repair quotation
-                  {actionNeededCount > 1 ? 's' : ''} awaiting your approval
+                  You have {actionNeededCount} quotation{actionNeededCount > 1 ? 's' : ''} awaiting your approval
                 </p>
                 <p className="text-xs text-purple-700">
                   Review the diagnosis and estimated cost so our team can schedule your home visit.
@@ -138,71 +164,94 @@ const CustomerDashboard = () => {
           </div>
         )}
 
-        {/* KPI Cards */}
+        {/* ── KPI Cards ────────────────────────────────────────── */}
         <div className="grid grid-cols-2 gap-4 lg:grid-cols-4">
-          <div className="rounded-xl border border-stone-200 bg-white p-4 shadow-sm">
+          {/* Total */}
+          <div className="rounded-xl border border-stone-200 bg-white p-4 shadow-sm border-l-4 border-l-stone-400">
             <div className="flex items-center justify-between">
               <span className="text-xs font-medium text-stone-500">Total Requests</span>
-              <Wrench className="h-4 w-4 text-stone-400" />
+              <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-stone-100">
+                <Wrench className="h-4 w-4 text-stone-500" />
+              </div>
             </div>
-            <p className="mt-2 text-2xl font-bold text-stone-900">{totalRequests}</p>
+            <p className="mt-3 text-2xl font-extrabold text-stone-900">{totalRequests}</p>
+            <p className="text-xs text-stone-400 mt-0.5">all time</p>
           </div>
 
-          <div className="rounded-xl border border-stone-200 bg-white p-4 shadow-sm">
+          {/* Active */}
+          <div className="rounded-xl border border-stone-200 bg-white p-4 shadow-sm border-l-4 border-l-teal-500">
             <div className="flex items-center justify-between">
               <span className="text-xs font-medium text-stone-500">Active Repairs</span>
-              <Clock className="h-4 w-4 text-teal-600" />
+              <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-teal-50">
+                <Clock className="h-4 w-4 text-teal-600" />
+              </div>
             </div>
-            <p className="mt-2 text-2xl font-bold text-teal-700">{activeCount}</p>
+            <p className="mt-3 text-2xl font-extrabold text-teal-700">{activeCount}</p>
+            <p className="text-xs text-teal-400 mt-0.5">in progress</p>
           </div>
 
-          <div className="rounded-xl border border-stone-200 bg-white p-4 shadow-sm">
+          {/* Needs Action */}
+          <div className="rounded-xl border border-stone-200 bg-white p-4 shadow-sm border-l-4 border-l-purple-500">
             <div className="flex items-center justify-between">
-              <span className="text-xs font-medium text-stone-500">Needs Quote Approval</span>
-              <FileText className="h-4 w-4 text-purple-500" />
+              <span className="text-xs font-medium text-stone-500">Needs Approval</span>
+              <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-purple-50">
+                <FileText className="h-4 w-4 text-purple-500" />
+              </div>
             </div>
-            <p className="mt-2 text-2xl font-bold text-purple-600">{actionNeededCount}</p>
+            <p className="mt-3 text-2xl font-extrabold text-purple-600">{actionNeededCount}</p>
+            <p className="text-xs text-purple-400 mt-0.5">quote{actionNeededCount !== 1 ? 's' : ''} pending</p>
           </div>
 
-          <div className="rounded-xl border border-stone-200 bg-white p-4 shadow-sm">
+          {/* Completed */}
+          <div className="rounded-xl border border-stone-200 bg-white p-4 shadow-sm border-l-4 border-l-emerald-500">
             <div className="flex items-center justify-between">
               <span className="text-xs font-medium text-stone-500">Completed</span>
-              <CheckCircle2 className="h-4 w-4 text-emerald-500" />
+              <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-emerald-50">
+                <CheckCircle2 className="h-4 w-4 text-emerald-500" />
+              </div>
             </div>
-            <p className="mt-2 text-2xl font-bold text-emerald-600">{completedCount}</p>
+            <p className="mt-3 text-2xl font-extrabold text-emerald-600">{completedCount}</p>
+            <p className="text-xs text-emerald-400 mt-0.5">repaired</p>
           </div>
         </div>
 
-        {/* Filter Tabs */}
+        {/* ── Filter Tabs ──────────────────────────────────────── */}
         <div className="flex flex-wrap gap-2">
           {[
-            { key: 'ALL', label: `All (${totalRequests})` },
-            { key: 'ACTIVE', label: `Active (${activeCount})` },
-            { key: 'ACTION', label: `Awaiting Quote Approval (${actionNeededCount})` },
-            { key: 'COMPLETED', label: `Completed (${completedCount})` },
+            { key: 'ALL',       label: `All`,                  count: totalRequests },
+            { key: 'ACTIVE',    label: `Active`,               count: activeCount },
+            { key: 'ACTION',    label: `Awaiting Approval`,    count: actionNeededCount },
+            { key: 'COMPLETED', label: `Completed`,            count: completedCount },
           ].map((tab) => (
             <button
               key={tab.key}
               onClick={() => setFilterStatus(tab.key)}
-              className={`rounded-lg px-3.5 py-1.5 text-xs font-semibold transition ${
+              className={`inline-flex items-center gap-1.5 rounded-full px-4 py-1.5 text-xs font-semibold transition ${
                 filterStatus === tab.key
-                  ? 'bg-teal-700 text-white'
+                  ? 'bg-teal-700 text-white shadow-sm'
                   : 'border border-stone-200 bg-white text-stone-600 hover:bg-stone-50'
               }`}
             >
               {tab.label}
+              <span className={`rounded-full px-1.5 py-0.5 text-[10px] font-bold ${
+                filterStatus === tab.key ? 'bg-teal-600 text-teal-100' : 'bg-stone-100 text-stone-500'
+              }`}>
+                {tab.count}
+              </span>
             </button>
           ))}
         </div>
 
-        {/* Repair Request Cards */}
+        {/* ── Repair Request Cards ─────────────────────────────── */}
         {loading ? (
           <div className="flex h-48 items-center justify-center rounded-2xl border border-stone-200 bg-white">
             <Loader2 className="h-7 w-7 animate-spin text-teal-600" />
           </div>
         ) : filteredRequests.length === 0 ? (
           <div className="rounded-2xl border border-stone-200 bg-white p-10 text-center">
-            <Wrench className="mx-auto h-10 w-10 text-stone-300" />
+            <div className="mx-auto flex h-14 w-14 items-center justify-center rounded-2xl bg-stone-100">
+              <Wrench className="h-7 w-7 text-stone-300" />
+            </div>
             <h3 className="mt-3 text-base font-semibold text-stone-800">
               No repair requests found
             </h3>
@@ -222,10 +271,10 @@ const CustomerDashboard = () => {
             {filteredRequests.map((req) => (
               <div
                 key={req.request_id}
-                className="flex flex-col justify-between rounded-2xl border border-stone-200 bg-white p-5 shadow-sm transition hover:border-teal-300"
+                className={`flex flex-col justify-between rounded-2xl border border-stone-200 border-l-4 bg-white p-5 shadow-sm transition hover:shadow-md hover:border-stone-300 ${STATUS_BORDER[req.status] ?? 'border-l-stone-300'}`}
               >
                 <div>
-                  {/* Top Row: Date, Appliance & Status (Internal Ticket # hidden from customer) */}
+                  {/* Top Row */}
                   <div className="flex items-start justify-between gap-3">
                     <div>
                       <span className="text-xs font-semibold text-stone-400">
@@ -243,12 +292,12 @@ const CustomerDashboard = () => {
                     <StatusBadge status={req.status} />
                   </div>
 
-                  {/* Problem Description */}
+                  {/* Problem */}
                   <p className="mt-3 line-clamp-2 text-sm text-stone-600">
                     {req.problem_description}
                   </p>
 
-                  {/* Meta Info: Service Address & Schedule / Quote */}
+                  {/* Meta */}
                   <div className="mt-4 space-y-1.5 border-t border-stone-100 pt-3 text-xs text-stone-600">
                     <div className="flex items-start gap-2">
                       <MapPin className="mt-0.5 h-3.5 w-3.5 shrink-0 text-stone-400" />
@@ -277,7 +326,7 @@ const CustomerDashboard = () => {
                   </div>
                 </div>
 
-                {/* Footer Action Link & Soft Cancel */}
+                {/* Footer */}
                 <div className="mt-4 flex items-center justify-between border-t border-stone-100 pt-3">
                   <div>
                     {req.status === 'Pending' ? (
@@ -285,7 +334,7 @@ const CustomerDashboard = () => {
                         type="button"
                         disabled={cancellingId === req.request_id}
                         onClick={() => handleCancelRequest(req.request_id, req.appliance_type)}
-                        className="inline-flex items-center gap-1 text-xs font-semibold text-red-600 hover:text-red-700 disabled:opacity-50"
+                        className="inline-flex items-center gap-1 text-xs font-semibold text-red-500 hover:text-red-600 disabled:opacity-50"
                       >
                         <XCircle className="h-3.5 w-3.5" />
                         {cancellingId === req.request_id ? 'Cancelling...' : 'Cancel Request'}
@@ -293,7 +342,7 @@ const CustomerDashboard = () => {
                     ) : (
                       <span className="text-xs text-stone-400">
                         {req.status === 'Quoted'
-                          ? 'Action required: Review quotation'
+                          ? '⚠ Action required: Review quotation'
                           : 'View full diagnosis & timeline'}
                       </span>
                     )}

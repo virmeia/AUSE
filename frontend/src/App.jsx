@@ -17,6 +17,7 @@ import Profile from './pages/customer/Profile';
 
 // Admin Pages
 import AdminDashboard from './pages/admin/AdminDashboard';
+import ExportReports from './pages/admin/ExportReports';
 import ManageRequests from './pages/admin/ManageRequests';
 import Customers from './pages/admin/Customers';
 import Payments from './pages/admin/Payments';
@@ -46,6 +47,7 @@ function App() {
           {/* Admin Protected Routes */}
           <Route element={<ProtectedRoute allowedRoles={['admin']} />}>
             <Route path="/admin/dashboard" element={<AdminDashboard />} />
+            <Route path="/admin/reports" element={<ExportReports />} />
             <Route path="/admin/requests" element={<ManageRequests />} />
             <Route path="/admin/customers" element={<Customers />} />
             <Route path="/admin/payments" element={<Payments />} />
