@@ -76,22 +76,24 @@ const Register = () => {
   };
 
   return (
-    <div className="flex min-h-screen flex-col bg-slate-50 text-slate-800">
+    <div className="relative flex min-h-screen flex-col overflow-hidden bg-gradient-to-br from-blue-100 via-sky-50 to-blue-200/75 text-slate-800">
+      {/* Soft Welcoming Blue Glows */}
+      <div className="pointer-events-none absolute -top-24 -right-24 h-96 w-96 rounded-full bg-blue-300/35 blur-3xl" />
+      <div className="pointer-events-none absolute -bottom-24 -left-24 h-96 w-96 rounded-full bg-sky-300/35 blur-3xl" />
+
       {/* Persistent Horizontal Navbar */}
       <PublicNavbar />
 
-      <main className="flex flex-1 items-center justify-center px-4 py-12 sm:px-6">
-        <div className="w-full max-w-lg rounded-3xl border border-slate-100 bg-white p-8 shadow-sm sm:p-10">
+      <main className="relative z-10 flex flex-1 items-center justify-center px-4 py-12 sm:px-6">
+        <div className="w-full max-w-lg rounded-3xl border border-white/90 bg-white/95 p-8 shadow-xl shadow-blue-900/10 backdrop-blur-md sm:p-10">
           {/* Header */}
           <div className="text-center">
-            {auseLogo && (
-              <img
-                src={auseLogo}
-                alt="AUSE Logo"
-                className="mx-auto mb-3 h-11 w-auto object-contain"
-              />
-            )}
-            <h1 className="text-2xl font-extrabold tracking-tight text-neutral-950">
+            <img
+              src={auseLogo}
+              alt="AUSE Logo"
+              className="mx-auto mb-3 h-11 w-auto object-contain"
+            />
+            <h1 className="text-2xl font-extrabold tracking-tight text-slate-950">
               Create your AUSE account
             </h1>
             <p className="mt-1.5 text-xs text-slate-500">
@@ -123,7 +125,7 @@ const Register = () => {
                     value={formData.full_name}
                     onChange={handleChange}
                     placeholder="Juan Dela Cruz"
-                    className="w-full rounded-xl border border-slate-200 bg-slate-50 py-2.5 pr-3.5 pl-10 text-xs text-neutral-900 outline-none transition focus:border-blue-600 focus:bg-white"
+                    className="w-full rounded-xl border border-slate-200 bg-slate-50/80 py-2.5 pr-3.5 pl-10 text-xs text-slate-900 outline-none transition focus:border-blue-600 focus:bg-white"
                   />
                 </div>
               </div>
@@ -141,7 +143,7 @@ const Register = () => {
                     value={formData.phone}
                     onChange={handleChange}
                     placeholder="0917 123 4567"
-                    className="w-full rounded-xl border border-slate-200 bg-slate-50 py-2.5 pr-3.5 pl-10 text-xs text-neutral-900 outline-none transition focus:border-blue-600 focus:bg-white"
+                    className="w-full rounded-xl border border-slate-200 bg-slate-50/80 py-2.5 pr-3.5 pl-10 text-xs text-slate-900 outline-none transition focus:border-blue-600 focus:bg-white"
                   />
                 </div>
               </div>
@@ -160,7 +162,7 @@ const Register = () => {
                   value={formData.email}
                   onChange={handleChange}
                   placeholder="juan@example.com"
-                  className="w-full rounded-xl border border-slate-200 bg-slate-50 py-2.5 pr-3.5 pl-10 text-xs text-neutral-900 outline-none transition focus:border-blue-600 focus:bg-white"
+                  className="w-full rounded-xl border border-slate-200 bg-slate-50/80 py-2.5 pr-3.5 pl-10 text-xs text-slate-900 outline-none transition focus:border-blue-600 focus:bg-white"
                 />
               </div>
             </div>
@@ -178,7 +180,7 @@ const Register = () => {
                   value={formData.address}
                   onChange={handleChange}
                   placeholder="House/Unit No., Street, Barangay, City"
-                  className="w-full rounded-xl border border-slate-200 bg-slate-50 py-2.5 pr-3.5 pl-10 text-xs text-neutral-900 outline-none transition focus:border-blue-600 focus:bg-white"
+                  className="w-full rounded-xl border border-slate-200 bg-slate-50/80 py-2.5 pr-3.5 pl-10 text-xs text-slate-900 outline-none transition focus:border-blue-600 focus:bg-white"
                 />
               </div>
             </div>
@@ -197,7 +199,7 @@ const Register = () => {
                     value={formData.password}
                     onChange={handleChange}
                     placeholder="Min. 6 characters"
-                    className="w-full rounded-xl border border-slate-200 bg-slate-50 py-2.5 pr-9 pl-10 text-xs text-neutral-900 outline-none transition focus:border-blue-600 focus:bg-white"
+                    className="w-full rounded-xl border border-slate-200 bg-slate-50/80 py-2.5 pr-9 pl-10 text-xs text-slate-900 outline-none transition focus:border-blue-600 focus:bg-white"
                   />
                   <button
                     type="button"
@@ -227,7 +229,7 @@ const Register = () => {
                     value={formData.confirmPassword}
                     onChange={handleChange}
                     placeholder="Re-enter password"
-                    className="w-full rounded-xl border border-slate-200 bg-slate-50 py-2.5 pr-3.5 pl-10 text-xs text-neutral-900 outline-none transition focus:border-blue-600 focus:bg-white"
+                    className="w-full rounded-xl border border-slate-200 bg-slate-50/80 py-2.5 pr-3.5 pl-10 text-xs text-slate-900 outline-none transition focus:border-blue-600 focus:bg-white"
                   />
                 </div>
               </div>
@@ -260,7 +262,7 @@ const Register = () => {
             <button
               type="submit"
               disabled={loading}
-              className="mt-2 inline-flex w-full items-center justify-center gap-2 rounded-xl bg-linear-to-r from-blue-700 to-blue-500 px-5 py-3 text-xs font-bold text-white shadow-sm transition hover:from-blue-800 hover:to-blue-600 disabled:cursor-not-allowed disabled:opacity-60"
+              className="mt-2 inline-flex w-full items-center justify-center gap-2 rounded-xl bg-gradient-to-r from-blue-700 to-blue-500 px-5 py-3 text-xs font-bold text-white shadow-md shadow-blue-600/20 transition hover:from-blue-800 hover:to-blue-600 disabled:cursor-not-allowed disabled:opacity-60"
             >
               {loading ? 'Creating account...' : 'Create Account & Book'}
               {!loading && <ArrowRight className="h-4 w-4" />}

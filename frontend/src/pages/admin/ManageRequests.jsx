@@ -1,416 +1,313 @@
 import { useState, useEffect } from 'react';
 import {
   Search,
-  Check,
-  X,
-  FileText,
-  Calendar,
-  Play,
+  FileSpreadsheet,
+  UserCheck,
   CheckCircle2,
-  CreditCard,
-  Image as ImageIcon,
-  MapPin,
-  Phone,
-  Loader2,
+  XCircle,
+  Eye,
 } from 'lucide-react';
-import toast from 'react-hot-toast';
 import Layout from '../../components/Layout';
-import StatusBadge from '../../components/StatusBadge';
+import ItemizedQuoteModal from '../../components/ItemizedQuoteModal';
+import TechnicianDispatchModal from '../../components/TechnicianDispatchModal';
 import api from '../../api/axios';
-import { QuoteModal, ScheduleModal, PaymentModal } from '../../components/Modals';
 
-const APPLIANCE_OPTIONS = [
-  'ALL',
-  'Refrigerator',
-  'Washing Machine',
-  'Air Conditioner',
-  'Electric Fan',
-  'Microwave Oven',
-];
-
-const STATUS_OPTIONS = [
-  'ALL',
-  'Pending',
-  'Approved',
-  'Quoted',
-  'Quote Approved',
-  'Scheduled',
-  'In Progress',
-  'Completed',
-  'Rejected',
-  'Quote Rejected',
-];
-
-const BACKEND_ORIGIN = (import.meta.env.VITE_API_URL || 'http://localhost:5000/api').replace(
-  '/api',
-  ''
-);
+const formatPHP = (amount) =>
+  new Intl.NumberFormat('en-PH', {
+    style: 'currency',
+    currency: 'PHP',
+  }).format(Number(amount || 0));
 
 const ManageRequests = () => {
   const [requests, setRequests] = useState([]);
+  const [search, setSearch] = useState('');
+  const [statusFilter, setStatusFilter] = useState('');
   const [loading, setLoading] = useState(true);
 
-  // Filters
-  const [searchQuery, setSearchQuery] = useState('');
-  const [statusFilter, setStatusFilter] = useState('ALL');
-  const [applianceFilter, setApplianceFilter] = useState('ALL');
+  const [quoteTarget, setQuoteTarget] = useState(null);
+  const [dispatchTarget, setDispatchTarget] = useState(null);
+  const [detailTarget, setDetailTarget] = useState(null);
 
-  // Active modal state (ready for Day 4–6 Modals.jsx integration)
-  const [selectedRequest, setSelectedRequest] = useState(null);
-  const [activeModal, setActiveModal] = useState(null); // 'quote' | 'schedule' | 'payment' | 'image'
-  const [actionLoadingId, setActionLoadingId] = useState(null);
-
-  const fetchAllRequests = async () => {
+  const fetchRequests = async () => {
+    setLoading(true);
     try {
-      const { data } = await api.get('/requests');
-      setRequests(data);
-    } catch (error) {
-      toast.error('Failed to load service requests.');
+      const res = await api.get('/requests');
+      setRequests(Array.isArray(res.data) ? res.data : res.data?.requests || []);
+    } catch (err) {
+      console.error('Failed to fetch requests:', err);
     } finally {
       setLoading(false);
     }
   };
 
   useEffect(() => {
-    fetchAllRequests();
+    fetchRequests();
   }, []);
 
-  // Quick status transitions (Approve, Reject, In Progress, Completed)
-  const handleStatusUpdate = async (requestId, newStatus) => {
-    let admin_remarks = null;
-    if (newStatus === 'Rejected') {
-      admin_remarks = window.prompt('Enter reason for rejecting this request (optional):');
-      if (admin_remarks === null) return; // User cancelled prompt
-    }
-
-    setActionLoadingId(requestId);
+  const handleStatusChange = async (id, status) => {
     try {
-      await api.put(`/requests/${requestId}/status`, {
-        status: newStatus,
-        admin_remarks,
-      });
-      toast.success(`Request #${requestId} marked as ${newStatus}.`);
-      fetchAllRequests();
-    } catch (error) {
-      toast.error(error.response?.data?.message || 'Failed to update status.');
-    } finally {
-      setActionLoadingId(null);
+      await api.put(`/requests/${id}/status`, { status });
+      fetchRequests();
+    } catch (err) {
+      alert(err.response?.data?.message || 'Failed to update status.');
     }
   };
 
-  const openModal = (request, modalType) => {
-  setSelectedRequest(request);
-  setActiveModal(modalType);
-  };
-
-  const filteredRequests = requests.filter((req) => {
-    const matchesStatus = statusFilter === 'ALL' || req.status === statusFilter;
-    const matchesAppliance =
-      applianceFilter === 'ALL' || req.appliance_type === applianceFilter;
-    const term = searchQuery.toLowerCase();
+  const filtered = requests.filter((r) => {
+    const matchesStatus = !statusFilter || r.status === statusFilter;
+    const q = search.toLowerCase();
     const matchesSearch =
-      !term ||
-      String(req.request_id).includes(term) ||
-      req.customer_name?.toLowerCase().includes(term) ||
-      req.appliance_type?.toLowerCase().includes(term) ||
-      req.service_address?.toLowerCase().includes(term);
-
-    return matchesStatus && matchesAppliance && matchesSearch;
+      !q ||
+      String(r.request_id).includes(q) ||
+      (r.customer_name || '').toLowerCase().includes(q) ||
+      (r.appliance_type || '').toLowerCase().includes(q) ||
+      (r.service_address || '').toLowerCase().includes(q);
+    return matchesStatus && matchesSearch;
   });
-
-  const formatDate = (dateStr) => {
-    if (!dateStr) return '—';
-    return new Date(dateStr).toLocaleDateString('en-US', {
-      month: 'short',
-      day: 'numeric',
-      year: 'numeric',
-    });
-  };
 
   return (
     <Layout>
       <div className="mx-auto max-w-7xl space-y-6">
-        {/* Page Header */}
-        <div>
-          <h1 className="text-2xl font-bold text-slate-900">Service Request Management</h1>
-          <p className="mt-1 text-sm text-slate-500">
-            Review incoming repair requests, record diagnoses & quotes, and schedule home visits.
-          </p>
-        </div>
-
-        {/* Search & Filter Bar */}
-        <div className="grid grid-cols-1 gap-3 rounded-xl border border-slate-200 bg-white p-4 shadow-sm md:grid-cols-4">
-          <div className="relative md:col-span-2">
-            <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
-            <input
-              type="text"
-              value={searchQuery}
-              onChange={(e) => setSearchQuery(e.target.value)}
-              placeholder="Search by ticket #, customer name, or address..."
-              className="w-full rounded-lg border border-slate-300 py-2 pl-9 pr-3 text-sm focus:border-blue-600 focus:outline-none"
-            />
+        {/* Header & Search Filter Bar */}
+        <div className="flex flex-col justify-between gap-4 sm:flex-row sm:items-center">
+          <div>
+            <h1 className="text-2xl font-extrabold tracking-tight text-slate-900">
+              Service Request Queue
+            </h1>
+            <p className="mt-1 text-sm text-slate-500">
+              Send itemized quotations, assign field technicians, and track repair progress.
+            </p>
           </div>
 
-          <select
-            value={statusFilter}
-            onChange={(e) => setStatusFilter(e.target.value)}
-            className="rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm text-slate-700 focus:border-blue-600 focus:outline-none"
-          >
-            {STATUS_OPTIONS.map((st) => (
-              <option key={st} value={st}>
-                {st === 'ALL' ? 'All Statuses' : st}
-              </option>
-            ))}
-          </select>
+          <div className="flex flex-wrap items-center gap-2.5">
+            <div className="relative">
+              <Search className="pointer-events-none absolute top-1/2 left-3 h-3.5 w-3.5 -translate-y-1/2 text-slate-400" />
+              <input
+                type="text"
+                value={search}
+                onChange={(e) => setSearch(e.target.value)}
+                placeholder="Search ticket, customer, unit..."
+                className="rounded-xl border border-slate-200 bg-white py-2 pr-3.5 pl-9 text-xs text-slate-900 outline-none focus:border-blue-600"
+              />
+            </div>
 
-          <select
-            value={applianceFilter}
-            onChange={(e) => setApplianceFilter(e.target.value)}
-            className="rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm text-slate-700 focus:border-blue-600 focus:outline-none"
-          >
-            {APPLIANCE_OPTIONS.map((app) => (
-              <option key={app} value={app}>
-                {app === 'ALL' ? 'All Appliances' : app}
-              </option>
-            ))}
-          </select>
+            <select
+              value={statusFilter}
+              onChange={(e) => setStatusFilter(e.target.value)}
+              className="rounded-xl border border-slate-200 bg-white px-3.5 py-2 text-xs font-semibold text-slate-900 outline-none focus:border-blue-600"
+            >
+              <option value="">All Statuses</option>
+              <option value="Pending">Pending</option>
+              <option value="Quoted">Quoted</option>
+              <option value="Quote Approved">Quote Approved</option>
+              <option value="Scheduled">Scheduled</option>
+              <option value="In Progress">In Progress</option>
+              <option value="Completed">Completed</option>
+              <option value="Cancelled">Cancelled</option>
+            </select>
+          </div>
         </div>
 
-        {/* Requests Table */}
-        <div className="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm">
-          {loading ? (
-            <div className="flex h-56 items-center justify-center">
-              <Loader2 className="h-7 w-7 animate-spin text-blue-600" />
-            </div>
-          ) : filteredRequests.length === 0 ? (
-            <div className="p-10 text-center text-sm text-slate-500">
-              No service requests match your current filters.
-            </div>
-          ) : (
-            <div className="overflow-x-auto">
-              <table className="w-full border-collapse text-left text-sm">
-                <thead className="border-b border-slate-200 bg-slate-50 text-xs font-semibold uppercase text-slate-500">
+        {/* Requests Table Card */}
+        <div className="rounded-2xl border border-slate-100 bg-white p-6 shadow-sm">
+          <div className="overflow-x-auto">
+            <table className="w-full border-collapse text-left">
+              <thead>
+                <tr className="border-b border-slate-100 text-[10px] font-extrabold uppercase tracking-wider text-slate-400">
+                  <th className="py-3 pr-3">Ticket</th>
+                  <th className="px-3 py-3">Customer & Location</th>
+                  <th className="px-3 py-3">Appliance</th>
+                  <th className="px-3 py-3">Status</th>
+                  <th className="px-3 py-3">Technician</th>
+                  <th className="px-3 py-3">Quote</th>
+                  <th className="pl-3 py-3 text-right">Actions</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-slate-100 text-xs">
+                {loading ? (
                   <tr>
-                    <th className="px-4 py-3.5">Ticket & Customer</th>
-                    <th className="px-4 py-3.5">Appliance & Issue</th>
-                    <th className="px-4 py-3.5">Service Location & Schedule</th>
-                    <th className="px-4 py-3.5">Quotation</th>
-                    <th className="px-4 py-3.5">Status</th>
-                    <th className="px-4 py-3.5 text-right">Actions</th>
+                    <td colSpan={7} className="py-10 text-center text-slate-400">
+                      Loading service tickets...
+                    </td>
                   </tr>
-                </thead>
-                <tbody className="divide-y divide-slate-100">
-                  {filteredRequests.map((req) => (
-                    <tr key={req.request_id} className="hover:bg-slate-50/70">
-                      {/* Ticket & Customer */}
-                      <td className="px-4 py-4 align-top">
-                        <span className="font-bold text-slate-900">#{req.request_id}</span>
-                        <p className="mt-0.5 font-medium text-slate-800">{req.customer_name}</p>
-                        <p className="mt-0.5 flex items-center gap-1 text-xs text-slate-500">
-                          <Phone className="h-3 w-3" />
-                          {req.customer_phone}
+                ) : filtered.length === 0 ? (
+                  <tr>
+                    <td colSpan={7} className="py-10 text-center text-slate-400">
+                      No repair requests match your filter.
+                    </td>
+                  </tr>
+                ) : (
+                  filtered.map((req) => (
+                    <tr
+                      key={req.request_id}
+                      className="transition-colors hover:bg-slate-50/80"
+                    >
+                      <td className="py-3.5 pr-3 font-extrabold text-slate-950">
+                        #{req.request_id}
+                      </td>
+                      <td className="px-3 py-3.5">
+                        <p className="font-bold text-slate-900">{req.customer_name}</p>
+                        <p className="max-w-50 truncate text-[11px] text-slate-400">
+                          {req.service_address}
                         </p>
                       </td>
-
-                      {/* Appliance & Problem */}
-                      <td className="max-w-xs px-4 py-4 align-top">
-                        <p className="font-semibold text-slate-900">{req.appliance_type}</p>
+                      <td className="px-3 py-3.5">
+                        <p className="font-semibold text-slate-800">
+                          {req.appliance_type}
+                        </p>
                         {req.brand_model && (
-                          <p className="text-xs text-slate-500">{req.brand_model}</p>
-                        )}
-                        <p className="mt-1 line-clamp-2 text-xs text-slate-600">
-                          {req.problem_description}
-                        </p>
-                        {req.appliance_image && (
-                          <button
-                            onClick={() => openModal(req, 'image')}
-                            className="mt-1.5 inline-flex items-center gap-1 text-xs font-medium text-blue-600 hover:underline"
-                          >
-                            <ImageIcon className="h-3.5 w-3.5" />
-                            View Photo
-                          </button>
+                          <p className="text-[11px] text-slate-400">{req.brand_model}</p>
                         )}
                       </td>
-
-                      {/* Location & Schedule */}
-                      <td className="max-w-xs px-4 py-4 align-top text-xs text-slate-600">
-                        <p className="flex items-start gap-1">
-                          <MapPin className="mt-0.5 h-3.5 w-3.5 shrink-0 text-slate-400" />
-                          <span>{req.service_address}</span>
-                        </p>
-                        {req.scheduled_date ? (
-                          <p className="mt-1.5 flex items-center gap-1 font-semibold text-blue-700">
-                            <Calendar className="h-3.5 w-3.5 shrink-0" />
-                            {formatDate(req.scheduled_date)} ({req.scheduled_time})
-                          </p>
-                        ) : req.preferred_date ? (
-                          <p className="mt-1.5 text-slate-400">
-                            Pref: {formatDate(req.preferred_date)}
-                          </p>
-                        ) : null}
+                      <td className="px-3 py-3.5">
+                        <span
+                          className={`inline-flex rounded-lg px-2.5 py-1 text-[11px] font-bold ${
+                            req.status === 'Completed'
+                              ? 'bg-emerald-50 text-emerald-700'
+                              : req.status === 'Cancelled' || req.status === 'Quote Rejected'
+                                ? 'bg-rose-50 text-rose-600'
+                                : req.status === 'Pending'
+                                  ? 'bg-amber-50 text-amber-700'
+                                  : 'bg-blue-50 text-blue-700'
+                          }`}
+                        >
+                          {req.status}
+                        </span>
                       </td>
-
-                      {/* Quotation */}
-                      <td className="px-4 py-4 align-top">
-                        {Number(req.estimated_cost) > 0 ? (
+                      <td className="px-3 py-3.5 text-slate-600">
+                        {req.technician_name ? (
                           <div>
                             <p className="font-semibold text-slate-900">
-                              ₱{Number(req.estimated_cost).toLocaleString()}
+                              {req.technician_name}
                             </p>
-                            {req.payment_status && (
-                              <span className="text-[11px] font-medium text-emerald-600">
-                                {req.payment_status}
-                              </span>
+                            {req.scheduled_date && (
+                              <p className="text-[10px] text-slate-400">
+                                {new Date(req.scheduled_date).toLocaleDateString()}
+                              </p>
                             )}
                           </div>
                         ) : (
-                          <span className="text-xs text-slate-400">Not quoted</span>
+                          <span className="text-[11px] text-slate-400">Unassigned</span>
                         )}
                       </td>
-
-                      {/* Status */}
-                      <td className="px-4 py-4 align-top">
-                        <StatusBadge status={req.status} />
+                      <td className="px-3 py-3.5 font-bold text-slate-950">
+                        {req.estimated_cost ? formatPHP(req.estimated_cost) : '—'}
                       </td>
+                      <td className="pl-3 py-3.5">
+                        <div className="flex items-center justify-end gap-1.5">
+                          <button
+                            onClick={() => setDetailTarget(req)}
+                            title="View Details"
+                            className="rounded-lg border border-slate-200 p-1.5 text-slate-600 hover:bg-slate-100"
+                          >
+                            <Eye className="h-3.5 w-3.5" />
+                          </button>
 
-                      {/* Contextual Workflow Actions */}
-                      <td className="px-4 py-4 align-top text-right">
-                        <div className="inline-flex flex-wrap justify-end gap-1.5">
-                          {req.status === 'Pending' && (
+                          {!['Completed', 'Cancelled'].includes(req.status) && (
                             <>
                               <button
-                                disabled={actionLoadingId === req.request_id}
-                                onClick={() => handleStatusUpdate(req.request_id, 'Approved')}
-                                className="inline-flex items-center gap-1 rounded-lg bg-emerald-600 px-2.5 py-1.5 text-xs font-semibold text-white hover:bg-emerald-700"
+                                onClick={() => setQuoteTarget(req)}
+                                title="Build Itemized Quote"
+                                className="inline-flex items-center gap-1 rounded-lg bg-blue-50 px-2.5 py-1.5 text-[11px] font-bold text-blue-600 hover:bg-blue-100"
                               >
-                                <Check className="h-3.5 w-3.5" />
-                                Approve
+                                <FileSpreadsheet className="h-3.5 w-3.5" />
+                                Quote
                               </button>
+
                               <button
-                                disabled={actionLoadingId === req.request_id}
-                                onClick={() => handleStatusUpdate(req.request_id, 'Rejected')}
-                                className="inline-flex items-center gap-1 rounded-lg bg-red-600 px-2.5 py-1.5 text-xs font-semibold text-white hover:bg-red-700"
+                                onClick={() => setDispatchTarget(req)}
+                                title="Assign Technician"
+                                className="inline-flex items-center gap-1 rounded-lg bg-emerald-50 px-2.5 py-1.5 text-[11px] font-bold text-emerald-700 hover:bg-emerald-100"
                               >
-                                <X className="h-3.5 w-3.5" />
-                                Reject
+                                <UserCheck className="h-3.5 w-3.5" />
+                                Dispatch
+                              </button>
+
+                              <button
+                                onClick={() =>
+                                  handleStatusChange(req.request_id, 'Completed')
+                                }
+                                title="Mark Completed"
+                                className="rounded-lg bg-emerald-50 p-1.5 text-emerald-600 hover:bg-emerald-100"
+                              >
+                                <CheckCircle2 className="h-3.5 w-3.5" />
                               </button>
                             </>
-                          )}
-
-                          {['Approved', 'Quoted', 'Quote Rejected'].includes(req.status) && (
-                            <button
-                              onClick={() => openModal(req, 'quote')}
-                              className="inline-flex items-center gap-1 rounded-lg bg-purple-600 px-2.5 py-1.5 text-xs font-semibold text-white hover:bg-purple-700"
-                            >
-                              <FileText className="h-3.5 w-3.5" />
-                              {req.status === 'Approved' ? 'Diagnose & Quote' : 'Revise Quote'}
-                            </button>
-                          )}
-
-                          {req.status === 'Quote Approved' && (
-                            <button
-                              onClick={() => openModal(req, 'schedule')}
-                              className="inline-flex items-center gap-1 rounded-lg bg-blue-600 px-2.5 py-1.5 text-xs font-semibold text-white hover:bg-blue-700"
-                            >
-                              <Calendar className="h-3.5 w-3.5" />
-                              Schedule Visit
-                            </button>
-                          )}
-
-                          {req.status === 'Scheduled' && (
-                            <button
-                              disabled={actionLoadingId === req.request_id}
-                              onClick={() => handleStatusUpdate(req.request_id, 'In Progress')}
-                              className="inline-flex items-center gap-1 rounded-lg bg-cyan-600 px-2.5 py-1.5 text-xs font-semibold text-white hover:bg-cyan-700"
-                            >
-                              <Play className="h-3.5 w-3.5" />
-                              Start Repair
-                            </button>
-                          )}
-
-                          {req.status === 'In Progress' && (
-                            <button
-                              disabled={actionLoadingId === req.request_id}
-                              onClick={() => handleStatusUpdate(req.request_id, 'Completed')}
-                              className="inline-flex items-center gap-1 rounded-lg bg-emerald-600 px-2.5 py-1.5 text-xs font-semibold text-white hover:bg-emerald-700"
-                            >
-                              <CheckCircle2 className="h-3.5 w-3.5" />
-                              Mark Completed
-                            </button>
-                          )}
-
-                          {req.status === 'Completed' && (
-                            <button
-                              onClick={() => openModal(req, 'payment')}
-                              className="inline-flex items-center gap-1 rounded-lg border border-slate-300 bg-white px-2.5 py-1.5 text-xs font-semibold text-slate-700 hover:bg-slate-50"
-                            >
-                              <CreditCard className="h-3.5 w-3.5" />
-                              Record Payment
-                            </button>
                           )}
                         </div>
                       </td>
                     </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-          )}
+                  ))
+                )}
+              </tbody>
+            </table>
+          </div>
         </div>
       </div>
 
-      {/* Image Preview Lightbox Modal */}
-      {activeModal === 'image' && selectedRequest?.appliance_image && (
-        <div
-          onClick={() => setActiveModal(null)}
-          className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/75 p-4"
-        >
-          <div
-            onClick={(e) => e.stopPropagation()}
-            className="relative max-w-lg overflow-hidden rounded-2xl bg-white p-4 shadow-2xl"
-          >
-            <div className="mb-3 flex items-center justify-between">
-              <h3 className="text-sm font-bold text-slate-900">
-                Ticket #{selectedRequest.request_id} — {selectedRequest.appliance_type}
-              </h3>
-              <button
-                onClick={() => setActiveModal(null)}
-                className="rounded-lg p-1 text-slate-500 hover:bg-slate-100"
-              >
-                <X className="h-5 w-5" />
-              </button>
-            </div>
-            <img
-              src={`${BACKEND_ORIGIN}${selectedRequest.appliance_image}`}
-              alt={selectedRequest.appliance_type}
-              className="max-h-[70vh] w-full rounded-xl object-contain"
-            />
-          </div>
-        </div>
+      {/* Itemized Quotation Modal */}
+      {quoteTarget && (
+        <ItemizedQuoteModal
+          request={quoteTarget}
+          onClose={() => setQuoteTarget(null)}
+          onSaved={fetchRequests}
+        />
       )}
 
-      {activeModal === 'quote' && selectedRequest && (
-        <QuoteModal
-            request={selectedRequest}
-            onClose={() => setActiveModal(null)}
-            onSuccess={fetchAllRequests}
+      {/* Technician Dispatch Modal */}
+      {dispatchTarget && (
+        <TechnicianDispatchModal
+          request={dispatchTarget}
+          onClose={() => setDispatchTarget(null)}
+          onAssigned={fetchRequests}
         />
-        )}
+      )}
 
-      {activeModal === 'schedule' && selectedRequest && (
-        <ScheduleModal
-            request={selectedRequest}
-            onClose={() => setActiveModal(null)}
-            onSuccess={fetchAllRequests}
-        />
-        )}
-        
-      {activeModal === 'payment' && selectedRequest && (
-        <PaymentModal
-          request={selectedRequest}
-          onClose={() => setActiveModal(null)}
-          onSuccess={fetchAllRequests}
-        />
+      {/* Quick Ticket Details Modal */}
+      {detailTarget && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/40 p-4 backdrop-blur-xs">
+          <div className="w-full max-w-lg rounded-3xl bg-white p-6 shadow-2xl">
+            <div className="flex items-center justify-between border-b border-slate-100 pb-3">
+              <h3 className="text-base font-extrabold text-slate-950">
+                Ticket #{detailTarget.request_id} — {detailTarget.appliance_type}
+              </h3>
+              <button
+                onClick={() => setDetailTarget(null)}
+                className="text-slate-400 hover:text-slate-900"
+              >
+                <XCircle className="h-5 w-5" />
+              </button>
+            </div>
+
+            <div className="mt-4 space-y-2.5 text-xs text-slate-600">
+              <p>
+                <strong className="text-slate-950">Customer:</strong>{' '}
+                {detailTarget.customer_name} ({detailTarget.customer_phone || 'No phone'})
+              </p>
+              <p>
+                <strong className="text-slate-950">Address:</strong>{' '}
+                {detailTarget.service_address}
+              </p>
+              <p>
+                <strong className="text-slate-950">Problem Description:</strong>{' '}
+                {detailTarget.problem_description}
+              </p>
+              {detailTarget.technician_notes && (
+                <p className="rounded-xl bg-emerald-50 p-3 text-emerald-800">
+                  <strong>Technician Field Notes:</strong>{' '}
+                  {detailTarget.technician_notes}
+                </p>
+              )}
+              {detailTarget.appliance_image && (
+                <img
+                  src={`http://localhost:5000${detailTarget.appliance_image}`}
+                  alt="Uploaded appliance"
+                  className="mt-2 max-h-52 w-full rounded-2xl border border-slate-100 object-cover"
+                />
+              )}
+            </div>
+          </div>
+        </div>
       )}
     </Layout>
   );

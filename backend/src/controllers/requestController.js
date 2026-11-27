@@ -1,5 +1,7 @@
 const pool = require('../config/db');
 const logActivity = require('../utils/activityLogger');
+const { sendUserEmail } = require('../utils/mailer');
+const { streamReceiptPdf } = require('../utils/receiptPdf');
 
 // Helper: Insert an in-app notification for a user
 const createNotification = async (userId, requestId, title, message) => {
@@ -83,9 +85,11 @@ const createRequest = async (req, res) => {
 const getMyRequests = async (req, res) => {
   try {
     const [rows] = await pool.query(
-      `SELECT r.*, p.payment_id, p.total_amount, p.amount_paid, p.balance, p.payment_status
+      `SELECT r.*, p.payment_id, p.total_amount, p.amount_paid, p.balance, p.payment_status,
+              t.full_name AS technician_name, t.phone_number AS technician_phone
        FROM repair_requests r
        LEFT JOIN payments p ON r.request_id = p.request_id
+       LEFT JOIN users t ON r.technician_id = t.user_id
        WHERE r.customer_id = ?
        ORDER BY r.created_at DESC`,
       [req.user.user_id]
@@ -97,16 +101,18 @@ const getMyRequests = async (req, res) => {
   }
 };
 
-// @desc    Get all repair requests (Admin queue with customer details)
+// @desc    Get all repair requests (Admin queue with customer & technician details)
 // @route   GET /api/requests
 // @access  Private (Admin)
 const getAllRequests = async (req, res) => {
   try {
     const [rows] = await pool.query(
       `SELECT r.*, u.full_name AS customer_name, u.email AS customer_email, u.phone_number AS customer_phone,
+              t.full_name AS technician_name,
               p.payment_id, p.total_amount, p.amount_paid, p.balance, p.payment_status
        FROM repair_requests r
        JOIN users u ON r.customer_id = u.user_id
+       LEFT JOIN users t ON r.technician_id = t.user_id
        LEFT JOIN payments p ON r.request_id = p.request_id
        ORDER BY r.created_at DESC`
     );
@@ -124,9 +130,11 @@ const getRequestById = async (req, res) => {
   try {
     const [rows] = await pool.query(
       `SELECT r.*, u.full_name AS customer_name, u.email AS customer_email, u.phone_number AS customer_phone,
+              t.full_name AS technician_name,
               p.payment_id, p.total_amount, p.amount_paid, p.balance, p.payment_method, p.payment_status, p.notes AS payment_notes
        FROM repair_requests r
        JOIN users u ON r.customer_id = u.user_id
+       LEFT JOIN users t ON r.technician_id = t.user_id
        LEFT JOIN payments p ON r.request_id = p.request_id
        WHERE r.request_id = ?`,
       [req.params.id]
@@ -138,10 +146,21 @@ const getRequestById = async (req, res) => {
 
     const request = rows[0];
 
-    // Ensure customers can only view their own tickets
     if (req.user.role === 'customer' && request.customer_id !== req.user.user_id) {
       return res.status(403).json({ message: 'Access denied.' });
     }
+
+    const [quotationItems] = await pool.query(
+      'SELECT * FROM quotation_items WHERE request_id = ? ORDER BY item_id ASC',
+      [req.params.id]
+    );
+    request.quotation_items = quotationItems;
+
+    const [reviewRows] = await pool.query(
+      'SELECT * FROM reviews WHERE request_id = ? LIMIT 1',
+      [req.params.id]
+    );
+    request.review = reviewRows[0] || null;
 
     res.json(request);
   } catch (error) {
@@ -172,8 +191,13 @@ const updateRequestStatus = async (req, res) => {
     const ticket = existing[0];
 
     await pool.query(
-      'UPDATE repair_requests SET status = ?, admin_remarks = COALESCE(?, admin_remarks) WHERE request_id = ?',
-      [status, admin_remarks || null, req.params.id]
+      `UPDATE repair_requests
+       SET status = ?,
+           admin_remarks = COALESCE(?, admin_remarks),
+           completed_at = CASE WHEN ? = 'Completed' THEN COALESCE(completed_at, NOW()) ELSE completed_at END,
+           warranty_expires_at = CASE WHEN ? = 'Completed' THEN COALESCE(warranty_expires_at, DATE_ADD(NOW(), INTERVAL 30 DAY)) ELSE warranty_expires_at END
+       WHERE request_id = ?`,
+      [status, admin_remarks || null, status, status, req.params.id]
     );
 
     await createNotification(
@@ -226,6 +250,12 @@ const submitDiagnosisQuote = async (req, res) => {
       'Repair Quotation Ready',
       `A quotation of ₱${Number(estimated_cost).toLocaleString()} is ready for your ${ticket.appliance_type} (#${ticket.request_id}). Please review and approve.`
     );
+    sendUserEmail(
+      pool,
+      ticket.customer_id,
+      `AUSE Quotation Ready — Ticket #${ticket.request_id}`,
+      `Your repair quotation of ₱${Number(estimated_cost).toLocaleString()} for ${ticket.appliance_type} (#${ticket.request_id}) is ready. Log in to your AUSE Customer Portal to review and approve.`
+    );
 
     res.json({ message: 'Diagnosis and quotation sent to customer.' });
   } catch (error) {
@@ -238,9 +268,9 @@ const submitDiagnosisQuote = async (req, res) => {
 // @route   PUT /api/requests/:id/quote-response
 // @access  Private (Customer)
 const respondToQuote = async (req, res) => {
-  const { decision } = req.body; // 'Quote Approved' or 'Quote Rejected'
+  const decision = req.body.decision || req.body.status;
 
-  if (!['Quote Approved', 'Quote Rejected'].includes(decision)) {
+  if (!['Quote Approved', 'Quote Rejected', 'Cancelled'].includes(decision)) {
     return res.status(400).json({ message: 'Decision must be Quote Approved or Quote Rejected.' });
   }
 
@@ -257,19 +287,30 @@ const respondToQuote = async (req, res) => {
       return res.status(403).json({ message: 'Access denied.' });
     }
 
-    await pool.query('UPDATE repair_requests SET status = ? WHERE request_id = ?', [
-      decision,
-      req.params.id,
-    ]);
+    const hasDiagnosticOnly =
+      decision === 'Quote Rejected' && Number(ticket.diagnostic_fee || 0) > 0;
 
-    // Notify Admins of customer's quote decision
+    if (hasDiagnosticOnly) {
+      await pool.query(
+        'UPDATE repair_requests SET status = ?, estimated_cost = ? WHERE request_id = ?',
+        [decision, Number(ticket.diagnostic_fee), req.params.id]
+      );
+    } else {
+      await pool.query('UPDATE repair_requests SET status = ? WHERE request_id = ?', [
+        decision,
+        req.params.id,
+      ]);
+    }
+
     const [admins] = await pool.query("SELECT user_id FROM users WHERE role = 'admin'");
     for (const admin of admins) {
       await createNotification(
         admin.user_id,
         ticket.request_id,
         `Quotation ${decision === 'Quote Approved' ? 'Approved' : 'Rejected'}`,
-        `Customer ${decision === 'Quote Approved' ? 'approved' : 'rejected'} the quotation for ${ticket.appliance_type} (#${ticket.request_id}).`
+        hasDiagnosticOnly
+          ? `Customer declined the main repair for ${ticket.appliance_type} (#${ticket.request_id}). Diagnostic fee due: ₱${Number(ticket.diagnostic_fee).toLocaleString()}.`
+          : `Customer ${decision === 'Quote Approved' ? 'approved' : 'rejected'} the quotation for ${ticket.appliance_type} (#${ticket.request_id}).`
       );
     }
 
@@ -298,7 +339,6 @@ const scheduleVisit = async (req, res) => {
       return res.status(404).json({ message: 'Repair request not found.' });
     }
 
-    // Check for double-booked date & time slot on other active requests
     const [conflicts] = await pool.query(
       `SELECT request_id FROM repair_requests 
        WHERE scheduled_date = ? AND scheduled_time = ? AND request_id != ? AND status IN ('Scheduled', 'In Progress')`,
@@ -335,7 +375,7 @@ const scheduleVisit = async (req, res) => {
   }
 };
 
-// @desc    Soft-cancel a repair request (Customer on Pending, or Admin anytime before Completed)
+// @desc    Soft-cancel a repair request
 // @route   PUT /api/requests/:id/cancel
 // @access  Private
 const cancelRequest = async (req, res) => {
@@ -391,6 +431,195 @@ const cancelRequest = async (req, res) => {
   }
 };
 
+// @desc    Get itemized quotation line items for a repair request
+// @route   GET /api/requests/:id/quotation-items
+// @access  Private
+const getQuotationItems = async (req, res) => {
+  try {
+    const [items] = await pool.query(
+      'SELECT * FROM quotation_items WHERE request_id = ? ORDER BY item_id ASC',
+      [req.params.id]
+    );
+    const total = items.reduce((sum, item) => sum + Number(item.subtotal || 0), 0);
+    res.json({ items, total });
+  } catch (err) {
+    console.error('Get quotation items error:', err);
+    res.status(500).json({ message: 'Failed to fetch quotation items.' });
+  }
+};
+
+// @desc    Admin saves itemized quotation & syncs estimated_cost / diagnostic_fee
+// @route   PUT /api/requests/:id/quotation-items
+// @access  Private (Admin)
+const saveQuotationItems = async (req, res) => {
+  const conn = await pool.getConnection();
+  try {
+    const { items = [], admin_remarks, admin_notes, status = 'Quoted' } = req.body;
+    const requestId = req.params.id;
+    const remarks = admin_remarks || admin_notes || null;
+
+    if (!Array.isArray(items) || items.length === 0) {
+      return res.status(400).json({ message: 'At least one quotation line item is required.' });
+    }
+
+    await conn.beginTransaction();
+    await conn.query('DELETE FROM quotation_items WHERE request_id = ?', [requestId]);
+
+    let grandTotal = 0;
+    let diagnosticTotal = 0;
+
+    for (const item of items) {
+      const qty = Math.max(1, Number(item.quantity || 1));
+      const price = Math.max(0, Number(item.unit_price || 0));
+      const lineTotal = qty * price;
+      grandTotal += lineTotal;
+
+      if (item.item_type === 'Diagnostic Fee') {
+        diagnosticTotal += lineTotal;
+      }
+
+      await conn.query(
+        'INSERT INTO quotation_items (request_id, item_type, description, quantity, unit_price) VALUES (?, ?, ?, ?, ?)',
+        [requestId, item.item_type || 'Part', item.description.trim(), qty, price]
+      );
+    }
+
+    await conn.query(
+      `UPDATE repair_requests 
+       SET estimated_cost = ?, diagnostic_fee = ?, admin_remarks = COALESCE(?, admin_remarks), status = ?
+       WHERE request_id = ?`,
+      [grandTotal, diagnosticTotal, remarks, status, requestId]
+    );
+
+    const [[reqRow]] = await conn.query(
+      'SELECT customer_id, appliance_type FROM repair_requests WHERE request_id = ?',
+      [requestId]
+    );
+
+    if (reqRow) {
+      await createNotification(
+        reqRow.customer_id,
+        requestId,
+        'Itemized Quotation Ready',
+        `Itemized quotation (₱${grandTotal.toLocaleString()}) is ready for your ${reqRow.appliance_type} request #${requestId}.`
+      );
+      sendUserEmail(
+        pool,
+        reqRow.customer_id,
+        `AUSE Itemized Quotation Ready — Ticket #${requestId}`,
+        `An itemized quotation totaling ₱${grandTotal.toLocaleString()} is ready for your ${reqRow.appliance_type} (#${requestId}). Log in to your AUSE Customer Portal to review the breakdown.`
+      );
+    }
+
+    await conn.commit();
+    res.json({ message: 'Itemized quotation saved.', total: grandTotal });
+  } catch (err) {
+    await conn.rollback();
+    console.error('Save quotation items error:', err);
+    res.status(500).json({ message: 'Failed to save itemized quotation.' });
+  } finally {
+    conn.release();
+  }
+};
+
+// @desc    Download PDF Official Receipt / Service Invoice
+// @route   GET /api/requests/:id/receipt
+// @access  Private (Customer owner or Admin)
+const downloadReceipt = async (req, res) => {
+  try {
+    const [rows] = await pool.query(
+      `SELECT r.*, u.full_name AS customer_name, u.email AS customer_email, u.phone_number AS customer_phone,
+              p.payment_id, p.total_amount, p.amount_paid, p.balance, p.payment_method, p.payment_status
+       FROM repair_requests r
+       JOIN users u ON r.customer_id = u.user_id
+       LEFT JOIN payments p ON r.request_id = p.request_id
+       WHERE r.request_id = ?`,
+      [req.params.id]
+    );
+
+    if (rows.length === 0) {
+      return res.status(404).json({ message: 'Repair request not found.' });
+    }
+
+    const ticket = rows[0];
+    if (req.user.role === 'customer' && ticket.customer_id !== req.user.user_id) {
+      return res.status(403).json({ message: 'Access denied.' });
+    }
+
+    const [items] = await pool.query(
+      'SELECT * FROM quotation_items WHERE request_id = ? ORDER BY item_id ASC',
+      [req.params.id]
+    );
+
+    streamReceiptPdf(res, ticket, items);
+  } catch (err) {
+    console.error('Download receipt error:', err);
+    res.status(500).json({ message: 'Failed to generate PDF receipt.' });
+  }
+};
+
+// @desc    Customer claims 30-day warranty on a Completed repair request
+// @route   POST /api/requests/:id/claim-warranty
+// @access  Private (Customer)
+const claimWarranty = async (req, res) => {
+  try {
+    const { reason } = req.body;
+    const [[orig]] = await pool.query(
+      'SELECT * FROM repair_requests WHERE request_id = ?',
+      [req.params.id]
+    );
+
+    if (!orig) {
+      return res.status(404).json({ message: 'Original repair request not found.' });
+    }
+    if (orig.customer_id !== req.user.user_id) {
+      return res.status(403).json({ message: 'Access denied.' });
+    }
+    if (orig.status !== 'Completed') {
+      return res.status(400).json({ message: 'Warranty can only be claimed on Completed repairs.' });
+    }
+    if (orig.warranty_expires_at && new Date(orig.warranty_expires_at) < new Date()) {
+      return res.status(400).json({ message: 'Your 30-day service warranty has expired.' });
+    }
+
+    const description = `[WARRANTY CLAIM for Ticket #${orig.request_id}] ${
+      (reason || 'Recurring issue under 30-day workmanship warranty.').trim()
+    }`;
+
+    const [result] = await pool.query(
+      `INSERT INTO repair_requests
+       (customer_id, appliance_type, brand_model, problem_description, service_address, status, warranty_claim_of)
+       VALUES (?, ?, ?, ?, ?, 'Pending', ?)`,
+      [
+        orig.customer_id,
+        orig.appliance_type,
+        orig.brand_model || null,
+        description,
+        orig.service_address,
+        orig.request_id,
+      ]
+    );
+
+    const [admins] = await pool.query("SELECT user_id FROM users WHERE role = 'admin'");
+    for (const admin of admins) {
+      await createNotification(
+        admin.user_id,
+        result.insertId,
+        'Warranty Claim Submitted',
+        `Customer claimed 30-day warranty for ${orig.appliance_type} (Original Ticket #${orig.request_id} → New Ticket #${result.insertId}).`
+      );
+    }
+
+    res.status(201).json({
+      message: 'Warranty claim submitted! Our team will prioritize your follow-up visit.',
+      request_id: result.insertId,
+    });
+  } catch (err) {
+    console.error('Claim warranty error:', err);
+    res.status(500).json({ message: 'Failed to submit warranty claim.' });
+  }
+};
+
 module.exports = {
   createRequest,
   getMyRequests,
@@ -401,4 +630,8 @@ module.exports = {
   respondToQuote,
   scheduleVisit,
   cancelRequest,
+  getQuotationItems,
+  saveQuotationItems,
+  downloadReceipt,
+  claimWarranty,
 };

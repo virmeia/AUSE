@@ -35,4 +35,18 @@ api.interceptors.response.use(
   }
 );
 
+export const downloadReceiptPdf = async (requestId) => {
+  const res = await api.get(`/requests/${requestId}/receipt`, {
+    responseType: 'blob',
+  });
+  const blobUrl = window.URL.createObjectURL(new Blob([res.data], { type: 'application/pdf' }));
+  const link = document.createElement('a');
+  link.href = blobUrl;
+  link.setAttribute('download', `AUSE-Receipt-${requestId}.pdf`);
+  document.body.appendChild(link);
+  link.click();
+  link.remove();
+  window.URL.revokeObjectURL(blobUrl);
+};
+
 export default api;

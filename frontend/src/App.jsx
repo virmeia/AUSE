@@ -15,12 +15,16 @@ import NewRequest from './pages/customer/NewRequest';
 import RequestDetails from './pages/customer/RequestDetails';
 import Profile from './pages/customer/Profile';
 
+// Technician Pages
+import TechnicianJobs from './pages/technician/TechnicianJobs';
+
 // Admin Pages
 import AdminDashboard from './pages/admin/AdminDashboard';
 import ExportReports from './pages/admin/ExportReports';
 import ManageRequests from './pages/admin/ManageRequests';
 import Customers from './pages/admin/Customers';
 import Payments from './pages/admin/Payments';
+import ManageInquiries from './pages/admin/ManageInquiries';
 import ActivityLogs from './pages/admin/ActivityLogs';
 import DeveloperContract from './pages/admin/DeveloperContract';
 
@@ -44,13 +48,19 @@ function App() {
             <Route path="/customer/profile" element={<Profile />} />
           </Route>
 
+          {/* Technician Protected Routes */}
+          <Route element={<ProtectedRoute allowedRoles={['technician']} />}>
+            <Route path="/technician/jobs" element={<TechnicianJobs />} />
+          </Route>
+
           {/* Admin Protected Routes */}
           <Route element={<ProtectedRoute allowedRoles={['admin']} />}>
             <Route path="/admin/dashboard" element={<AdminDashboard />} />
-            <Route path="/admin/reports" element={<ExportReports />} />
             <Route path="/admin/requests" element={<ManageRequests />} />
-            <Route path="/admin/customers" element={<Customers />} />
             <Route path="/admin/payments" element={<Payments />} />
+            <Route path="/admin/customers" element={<Customers />} />
+            <Route path="/admin/inquiries" element={<ManageInquiries />} />
+            <Route path="/admin/reports" element={<ExportReports />} />
             <Route path="/admin/activity-logs" element={<ActivityLogs />} />
             <Route path="/admin/developer-contract" element={<DeveloperContract />} />
           </Route>

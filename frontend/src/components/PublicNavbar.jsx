@@ -8,7 +8,11 @@ const PublicNavbar = () => {
   const { pathname } = useLocation();
 
   const dashboardPath =
-    user?.role === 'admin' ? '/admin/dashboard' : '/customer/dashboard';
+    user?.role === 'admin'
+      ? '/admin/dashboard'
+      : user?.role === 'technician'
+        ? '/technician/jobs'
+        : '/customer/dashboard';
 
   return (
     <header className="sticky top-0 z-30 border-b border-slate-200/70 bg-white/90 backdrop-blur-md">
@@ -23,7 +27,7 @@ const PublicNavbar = () => {
                 className="h-9 w-auto object-contain"
               />
             )}
-            <span className="text-xl font-black tracking-tight text-neutral-950">
+            <span className="text-xl font-black tracking-tight text-slate-950">
               AUSE
             </span>
           </Link>
@@ -55,7 +59,7 @@ const PublicNavbar = () => {
               className={`text-xs font-bold transition ${
                 pathname === '/login'
                   ? 'text-blue-600'
-                  : 'text-neutral-900 hover:text-blue-600'
+                  : 'text-slate-900 hover:text-blue-600'
               }`}
             >
               Sign In
@@ -79,7 +83,7 @@ const PublicNavbar = () => {
           )}
           <Link
             to={user ? dashboardPath : '/register'}
-            className="inline-flex items-center gap-1.5 rounded-xl bg-linear-to-r from-blue-700 to-blue-500 px-4 py-2 text-xs font-bold text-white shadow-sm transition hover:from-blue-800 hover:to-blue-600"
+            className="inline-flex items-center gap-1.5 rounded-xl bg-linear-to-r from-blue-600 to-cyan-500 px-4 py-2 text-xs font-bold text-white shadow-sm transition hover:from-blue-700 hover:to-cyan-600"
           >
             {user ? 'Dashboard' : 'Book a Repair'}
             <ArrowRight className="h-3.5 w-3.5" />

@@ -24,6 +24,8 @@ const Login = () => {
       const userData = await login(email, password);
       if (userData?.role === 'admin') {
         navigate('/admin/dashboard');
+      } else if (userData?.role === 'technician') {
+        navigate('/technician/jobs');
       } else {
         navigate('/customer/dashboard');
       }
@@ -37,30 +39,29 @@ const Login = () => {
   };
 
   return (
-    <div className="flex min-h-screen flex-col bg-slate-50 text-slate-800">
-      {/* Persistent Horizontal Navbar */}
+    <div className="relative flex min-h-screen flex-col overflow-hidden bg-linear-to-br from-blue-100 via-sky-50 to-blue-200/70 text-slate-800">
+      {/* Soft Ambient Glows */}
+      <div className="pointer-events-none absolute -top-24 -left-24 h-96 w-96 rounded-full bg-blue-300/35 blur-3xl" />
+      <div className="pointer-events-none absolute -right-24 -bottom-24 h-96 w-96 rounded-full bg-sky-300/35 blur-3xl" />
+
       <PublicNavbar />
 
-      <main className="flex flex-1 items-center justify-center px-4 py-12 sm:px-6">
-        <div className="w-full max-w-md rounded-3xl border border-slate-100 bg-white p-8 shadow-sm sm:p-10">
-          {/* Header */}
+      <main className="relative z-10 flex flex-1 items-center justify-center px-4 py-12 sm:px-6">
+        <div className="w-full max-w-md rounded-3xl border border-white/90 bg-white/95 p-8 shadow-xl shadow-blue-950/5 backdrop-blur-md sm:p-10">
           <div className="text-center">
-            {auseLogo && (
-              <img
-                src={auseLogo}
-                alt="AUSE Logo"
-                className="mx-auto mb-3 h-11 w-auto object-contain"
-              />
-            )}
-            <h1 className="text-2xl font-extrabold tracking-tight text-neutral-950">
+            <img
+              src={auseLogo}
+              alt="AUSE Logo"
+              className="mx-auto mb-3 h-11 w-auto object-contain"
+            />
+            <h1 className="text-2xl font-extrabold tracking-tight text-slate-950">
               Welcome back
             </h1>
             <p className="mt-1.5 text-xs text-slate-500">
-              Sign in to manage your appliance repair requests and quotations.
+              Sign in to access your AUSE service portal.
             </p>
           </div>
 
-          {/* Error Alert */}
           {error && (
             <div className="mt-6 flex items-start gap-2.5 rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-xs font-medium text-red-700">
               <AlertCircle className="mt-0.5 h-4 w-4 shrink-0 text-red-600" />
@@ -68,7 +69,6 @@ const Login = () => {
             </div>
           )}
 
-          {/* Form */}
           <form onSubmit={handleSubmit} className="mt-6 space-y-4">
             <div>
               <label className="mb-1.5 block text-xs font-semibold text-slate-700">
@@ -82,7 +82,7 @@ const Login = () => {
                   value={email}
                   onChange={(e) => setEmail(e.target.value)}
                   placeholder="you@example.com"
-                  className="w-full rounded-xl border border-slate-200 bg-slate-50 py-2.5 pr-4 pl-10 text-xs text-neutral-900 outline-none transition focus:border-blue-600 focus:bg-white"
+                  className="w-full rounded-xl border border-slate-200 bg-slate-50/80 py-2.5 pr-4 pl-10 text-xs text-slate-900 outline-none transition focus:border-blue-600 focus:bg-white"
                 />
               </div>
             </div>
@@ -99,7 +99,7 @@ const Login = () => {
                   value={password}
                   onChange={(e) => setPassword(e.target.value)}
                   placeholder="Enter your password"
-                  className="w-full rounded-xl border border-slate-200 bg-slate-50 py-2.5 pr-10 pl-10 text-xs text-neutral-900 outline-none transition focus:border-blue-600 focus:bg-white"
+                  className="w-full rounded-xl border border-slate-200 bg-slate-50/80 py-2.5 pr-10 pl-10 text-xs text-slate-900 outline-none transition focus:border-blue-600 focus:bg-white"
                 />
                 <button
                   type="button"
@@ -119,14 +119,13 @@ const Login = () => {
             <button
               type="submit"
               disabled={loading}
-              className="mt-2 inline-flex w-full items-center justify-center gap-2 rounded-xl bg-linear-to-r from-blue-700 to-blue-500 px-5 py-3 text-xs font-bold text-white shadow-sm transition hover:from-blue-800 hover:to-blue-600 disabled:cursor-not-allowed disabled:opacity-60"
+              className="mt-2 inline-flex w-full items-center justify-center gap-2 rounded-xl bg-linear-to-r from-blue-700 to-blue-500 px-5 py-3 text-xs font-bold text-white shadow-md shadow-blue-600/20 transition hover:from-blue-800 hover:to-blue-600 disabled:cursor-not-allowed disabled:opacity-60"
             >
               {loading ? 'Signing in...' : 'Sign In'}
               {!loading && <ArrowRight className="h-4 w-4" />}
             </button>
           </form>
 
-          {/* Footer Switch */}
           <p className="mt-6 text-center text-xs text-slate-500">
             Don&apos;t have an account yet?{' '}
             <Link

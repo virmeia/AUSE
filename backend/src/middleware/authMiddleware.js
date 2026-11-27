@@ -28,4 +28,13 @@ const adminOnly = (req, res, next) => {
   }
 };
 
-module.exports = { protect, adminOnly };
+// Restrict access to Technician accounts only
+const technicianOnly = (req, res, next) => {
+  if (req.user && req.user.role === 'technician') {
+    next();
+  } else {
+    return res.status(403).json({ message: 'Access denied. Technician privileges required.' });
+  }
+};
+
+module.exports = { protect, adminOnly, technicianOnly };

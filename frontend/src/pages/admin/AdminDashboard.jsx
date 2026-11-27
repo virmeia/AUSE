@@ -1,361 +1,418 @@
 import { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
 import {
+  Wallet,
   Wrench,
   Clock,
   CheckCircle2,
-  DollarSign,
-  Users,
-  ArrowRight,
-  Loader2,
-  TrendingUp,
-  BarChart2,
-  FileBarChart2,
+  ArrowUpRight,
+  BarChart3,
+  PieChart,
+  FileSpreadsheet,
 } from 'lucide-react';
-import {
-  AreaChart,
-  Area,
-  XAxis,
-  YAxis,
-  CartesianGrid,
-  Tooltip,
-  ResponsiveContainer,
-  BarChart,
-  Bar,
-  Cell,
-  LabelList,
-} from 'recharts';
-import toast from 'react-hot-toast';
 import Layout from '../../components/Layout';
 import api from '../../api/axios';
 
-/* ── Animated KPI count-up hook ───────────────────────────────── */
-function useCountUp(target, duration = 800) {
-  const [value, setValue] = useState(0);
-  useEffect(() => {
-    if (!target) { setValue(0); return; }
-    const num = Number(target);
-    const steps = 40;
-    const step = num / steps;
-    let current = 0;
-    const timer = setInterval(() => {
-      current = Math.min(current + step, num);
-      setValue(Math.floor(current));
-      if (current >= num) clearInterval(timer);
-    }, duration / steps);
-    return () => clearInterval(timer);
-  }, [target, duration]);
-  return value;
-}
+const formatPHP = (amount) =>
+  new Intl.NumberFormat('en-PH', {
+    style: 'currency',
+    currency: 'PHP',
+  }).format(Number(amount || 0));
 
-/* ── Custom Tooltip for AreaChart ─────────────────────────────── */
-const RevenueTooltip = ({ active, payload, label }) => {
-  if (!active || !payload?.length) return null;
-  return (
-    <div className="rounded-xl border border-teal-100 bg-white px-3 py-2 shadow-lg text-xs">
-      <p className="font-bold text-stone-700 mb-1">{label}</p>
-      <p className="text-teal-600 font-semibold">
-        ₱{Number(payload[0].value).toLocaleString()}
-      </p>
-      {payload[0].payload.paid_jobs !== undefined && (
-        <p className="text-stone-400 mt-0.5">{payload[0].payload.paid_jobs} jobs paid</p>
-      )}
-    </div>
-  );
-};
-
-const TEAL_SHADES = ['#0d9488', '#14b8a6', '#2dd4bf', '#5eead4', '#99f6e4'];
+const APPLIANCE_COLORS = [
+  'bg-blue-600',
+  'bg-cyan-500',
+  'bg-emerald-500',
+  'bg-amber-400',
+  'bg-rose-500',
+];
 
 const AdminDashboard = () => {
-  const [reportData, setReportData] = useState(null);
+  const [requests, setRequests] = useState([]);
+  const [payments, setPayments] = useState([]);
+  const [analytics, setAnalytics] = useState(null);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    const fetch = async () => {
+    const loadData = async () => {
+      setLoading(true);
       try {
-        const { data } = await api.get('/admin/reports');
-        setReportData(data);
-      } catch {
-        toast.error('Failed to load dashboard analytics.');
+        // Fetch from your core endpoints so KPIs always stay 100% synced
+        const [reqRes, payRes] = await Promise.all([
+          api.get('/requests'),
+          api.get('/payments').catch(() => ({ data: [] })),
+        ]);
+
+        const reqList = Array.isArray(reqRes.data)
+          ? reqRes.data
+          : reqRes.data?.requests || [];
+        const payList = Array.isArray(payRes.data)
+          ? payRes.data
+          : payRes.data?.payments || [];
+
+        setRequests(reqList);
+        setPayments(payList);
+
+        // Optional analytics endpoint if configured
+        const statsRes = await api.get('/reports/analytics').catch(() => ({ data: null }));
+        if (statsRes.data) setAnalytics(statsRes.data);
+      } catch (err) {
+        console.error('Error syncing dashboard data:', err);
       } finally {
         setLoading(false);
       }
     };
-    fetch();
+
+    loadData();
   }, []);
 
-  const summary = reportData?.summary || {};
-  const applianceBreakdown = reportData?.applianceBreakdown || [];
-  const monthlyTrend = reportData?.monthlyTrend || [];
+  // Compute live KPIs directly from synced database rows (with analytics fallback)
+  const totalRevenue =
+    analytics?.totalRevenue ??
+    analytics?.total_revenue ??
+    payments.reduce((sum, p) => sum + Number(p.amount_paid || p.amount || 0), 0);
 
-  const totalTickets = Number(summary.total_requests || 0);
-  const completionRate =
-    totalTickets > 0
-      ? Math.round((Number(summary.completed_requests || 0) / totalTickets) * 100)
-      : 0;
+  const totalRequests =
+    analytics?.totalRequests ?? analytics?.total_requests ?? requests.length;
 
-  /* Recharts data */
-  const areaData = monthlyTrend.map((m) => ({
-    name: m.month_label,
-    revenue: Number(m.collected_revenue || 0),
-    paid_jobs: m.paid_jobs,
-  }));
+  const pendingOrQuoted =
+    analytics?.pendingRequests ??
+    requests.filter((r) => ['Pending', 'Quoted'].includes(r.status)).length;
 
-  const barData = applianceBreakdown.map((item, i) => ({
-    name: item.category_name,
-    count: Number(item.request_count),
-    color: TEAL_SHADES[i % TEAL_SHADES.length],
-    pct:
-      totalTickets > 0
-        ? Math.round((Number(item.request_count) / totalTickets) * 100)
-        : 0,
-  }));
+  const completedRepairs =
+    analytics?.completedRequests ??
+    requests.filter((r) => r.status === 'Completed').length;
 
-  /* Animated KPI values */
-  const animRevenue = useCountUp(summary.total_revenue, 1000);
-  const animQueue = useCountUp(
-    Number(summary.pending_requests || 0) + Number(summary.active_requests || 0),
-    700
+  // Group requests by appliance type dynamically
+  const applianceCounts = requests.reduce((acc, r) => {
+    const key = r.appliance_type || 'Other';
+    acc[key] = (acc[key] || 0) + 1;
+    return acc;
+  }, {});
+
+  const applianceList =
+    analytics?.applianceBreakdown ||
+    Object.entries(applianceCounts).map(([appliance_type, count]) => ({
+      appliance_type,
+      count,
+    }));
+
+  const totalAppliances = Math.max(
+    applianceList.reduce((sum, item) => sum + Number(item.count || 0), 0),
+    1
   );
-  const animCompleted = useCountUp(summary.completed_requests, 800);
-  const animCustomers = useCountUp(summary.total_customers, 600);
+
+  // Group payments by month dynamically
+  const monthlyMap = payments.reduce((acc, p) => {
+    const dateVal = p.payment_date || p.created_at;
+    const monthLabel = dateVal
+      ? new Date(dateVal).toLocaleString('en-US', { month: 'short' })
+      : 'Recent';
+    acc[monthLabel] = (acc[monthLabel] || 0) + Number(p.amount_paid || p.amount || 0);
+    return acc;
+  }, {});
+
+  const monthlyRevenue =
+    analytics?.monthlyRevenue ||
+    Object.entries(monthlyMap).map(([month, total]) => ({ month, total }));
+
+  const maxMonthly = Math.max(...monthlyRevenue.map((m) => Number(m.total || 0)), 1);
+
+  const kpiCards = [
+    {
+      label: 'Total Revenue',
+      value: formatPHP(totalRevenue),
+      sub: `${payments.length} verified payments`,
+      icon: Wallet,
+      iconBg: 'bg-emerald-500 shadow-emerald-500/25',
+      subColor: 'text-emerald-600',
+    },
+    {
+      label: 'Total Requests',
+      value: totalRequests,
+      sub: 'All logged repair tickets',
+      icon: Wrench,
+      iconBg: 'bg-blue-600 shadow-blue-600/25',
+      subColor: 'text-blue-600',
+    },
+    {
+      label: 'Pending & Quoted',
+      value: pendingOrQuoted,
+      sub: 'Awaiting review or approval',
+      icon: Clock,
+      iconBg: 'bg-amber-400 text-slate-950 shadow-amber-400/30',
+      subColor: 'text-amber-600',
+    },
+    {
+      label: 'Completed Repairs',
+      value: completedRepairs,
+      sub: 'Closed doorstep visits',
+      icon: CheckCircle2,
+      iconBg: 'bg-cyan-500 shadow-cyan-500/25',
+      subColor: 'text-cyan-600',
+    },
+  ];
 
   return (
     <Layout>
       <div className="mx-auto max-w-7xl space-y-6">
-
-        {/* ── Page Header ───────────────────────────────────────── */}
-        <div className="flex flex-col justify-between gap-4 lg:flex-row lg:items-center">
+        {/* ── Top Welcome & Quick Report Shortcut ─────────────────── */}
+        <div className="flex flex-wrap items-center justify-between gap-4">
           <div>
-            <h1 className="text-2xl font-bold text-stone-900">Operations Dashboard</h1>
-            <p className="mt-1 text-sm text-stone-500">
-              Real-time service performance overview and revenue analytics.
+            <h1 className="text-2xl font-extrabold tracking-tight text-slate-900">
+              Operations Overview
+            </h1>
+            <p className="mt-1 text-sm text-slate-500">
+              Real-time repair tickets, technician schedule queue, and revenue metrics.
             </p>
           </div>
-          <div className="flex flex-wrap gap-2.5">
-            <Link
-              to="/admin/requests"
-              className="inline-flex items-center gap-2 rounded-xl bg-teal-600 px-4 py-2 text-sm font-semibold text-white shadow-sm hover:bg-teal-700 transition-colors"
-            >
-              Manage Queue
-              <ArrowRight className="h-4 w-4" />
-            </Link>
-            <Link
-              to="/admin/reports"
-              className="inline-flex items-center gap-2 rounded-xl border border-stone-200 bg-white px-4 py-2 text-sm font-semibold text-stone-700 shadow-sm hover:bg-stone-50 transition-colors"
-            >
-              <FileBarChart2 className="h-4 w-4 text-teal-600" />
-              View Reports
-            </Link>
+
+          <Link
+            to="/admin/reports"
+            className="inline-flex items-center gap-2 rounded-xl bg-gradient-to-r from-blue-700 to-blue-500 px-4 py-2.5 text-xs font-bold text-white shadow-sm transition hover:from-blue-800 hover:to-blue-600"
+          >
+            <FileSpreadsheet className="h-4 w-4" />
+            Export Reports
+          </Link>
+        </div>
+
+        {/* ── Multi-Color Purity UI 4-Card KPI Grid ───────────────── */}
+        <div className="grid grid-cols-1 gap-5 sm:grid-cols-2 xl:grid-cols-4">
+          {kpiCards.map((card) => {
+            const Icon = card.icon;
+            return (
+              <div
+                key={card.label}
+                className="flex items-center justify-between rounded-2xl border border-slate-100 bg-white p-5 shadow-sm transition-all hover:-translate-y-0.5 hover:shadow-md"
+              >
+                <div>
+                  <p className="text-[11px] font-bold uppercase tracking-wider text-slate-400">
+                    {card.label}
+                  </p>
+                  <p className="mt-1.5 text-xl font-extrabold text-slate-950">
+                    {loading ? '—' : card.value}
+                  </p>
+                  <p className={`mt-1 text-[11px] font-semibold ${card.subColor}`}>
+                    {card.sub}
+                  </p>
+                </div>
+
+                <div
+                  className={`flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl text-white shadow-sm ${card.iconBg}`}
+                >
+                  <Icon className="h-5 w-5" />
+                </div>
+              </div>
+            );
+          })}
+        </div>
+
+        {/* ── Visual Analytics Row ────────────────────────────────── */}
+        <div className="grid grid-cols-1 gap-6 lg:grid-cols-12">
+          {/* Monthly Revenue Bar Chart */}
+          <div className="rounded-2xl border border-slate-100 bg-white p-6 shadow-sm lg:col-span-7">
+            <div className="flex items-center justify-between">
+              <div>
+                <h3 className="text-sm font-extrabold text-slate-950">
+                  Monthly Revenue Collection
+                </h3>
+                <p className="text-xs text-slate-400">
+                  Verified service fees collected per month
+                </p>
+              </div>
+              <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-emerald-50 text-emerald-600">
+                <BarChart3 className="h-4 w-4" />
+              </div>
+            </div>
+
+            <div className="mt-5 rounded-2xl bg-slate-950 p-6 text-white">
+              {monthlyRevenue.length > 0 ? (
+                <div className="flex h-44 items-end justify-between gap-3 pt-4">
+                  {monthlyRevenue.map((item, idx) => {
+                    const heightPct = Math.max(
+                      Math.round((Number(item.total || 0) / maxMonthly) * 100),
+                      14
+                    );
+                    return (
+                      <div
+                        key={item.month || idx}
+                        className="group flex flex-1 flex-col items-center gap-2"
+                      >
+                        <span className="text-[10px] font-bold text-amber-300 opacity-0 transition group-hover:opacity-100">
+                          {formatPHP(item.total)}
+                        </span>
+                        <div className="flex h-32 w-full max-w-[36px] items-end rounded-full bg-white/10 p-1">
+                          <div
+                            style={{ height: `${heightPct}%` }}
+                            className="w-full rounded-full bg-gradient-to-t from-blue-500 to-amber-300 transition-all duration-500"
+                          />
+                        </div>
+                        <span className="text-[11px] font-semibold text-slate-300">
+                          {item.month}
+                        </span>
+                      </div>
+                    );
+                  })}
+                </div>
+              ) : (
+                <div className="flex h-44 items-center justify-center text-xs text-slate-400">
+                  No payment records logged yet.
+                </div>
+              )}
+            </div>
+          </div>
+
+          {/* Appliance Service Breakdown (Multi-color Progress Bars) */}
+          <div className="flex flex-col justify-between rounded-2xl border border-slate-100 bg-white p-6 shadow-sm lg:col-span-5">
+            <div>
+              <div className="flex items-center justify-between">
+                <div>
+                  <h3 className="text-sm font-extrabold text-slate-950">
+                    Requests by Appliance
+                  </h3>
+                  <p className="text-xs text-slate-400">
+                    Service demand across household units
+                  </p>
+                </div>
+                <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-amber-50 text-amber-600">
+                  <PieChart className="h-4 w-4" />
+                </div>
+              </div>
+
+              <div className="mt-6 space-y-4">
+                {applianceList.length > 0 ? (
+                  applianceList.map((item, idx) => {
+                    const pct = Math.round(
+                      (Number(item.count || 0) / totalAppliances) * 100
+                    );
+                    const barColor = APPLIANCE_COLORS[idx % APPLIANCE_COLORS.length];
+
+                    return (
+                      <div key={item.appliance_type} className="space-y-1.5">
+                        <div className="flex items-center justify-between text-xs">
+                          <span className="font-bold text-slate-900">
+                            {item.appliance_type}
+                          </span>
+                          <span className="font-semibold text-slate-500">
+                            {item.count} ({pct}%)
+                          </span>
+                        </div>
+                        <div className="h-2 w-full overflow-hidden rounded-full bg-slate-100">
+                          <div
+                            style={{ width: `${pct}%` }}
+                            className={`h-full rounded-full transition-all duration-500 ${barColor}`}
+                          />
+                        </div>
+                      </div>
+                    );
+                  })
+                ) : (
+                  <p className="py-10 text-center text-xs text-slate-400">
+                    No repair requests submitted yet.
+                  </p>
+                )}
+              </div>
+            </div>
+
+            <div className="mt-6 border-t border-slate-100 pt-4">
+              <Link
+                to="/admin/requests"
+                className="inline-flex items-center gap-1.5 text-xs font-bold text-blue-600 transition hover:text-blue-700"
+              >
+                Open Full Repair Queue
+                <ArrowUpRight className="h-3.5 w-3.5" />
+              </Link>
+            </div>
           </div>
         </div>
 
-        {loading ? (
-          <div className="flex h-64 items-center justify-center">
-            <Loader2 className="h-8 w-8 animate-spin text-teal-600" />
+        {/* ── Recent Repair Requests Table ────────────────────────── */}
+        <div className="rounded-2xl border border-slate-100 bg-white p-6 shadow-sm">
+          <div className="flex items-center justify-between border-b border-slate-100 pb-4">
+            <div>
+              <h3 className="text-base font-extrabold text-slate-950">
+                Recent Service Requests
+              </h3>
+              <p className="text-xs text-slate-400">
+                Latest incoming appliance tickets requiring diagnosis or scheduling
+              </p>
+            </div>
+            <Link
+              to="/admin/requests"
+              className="rounded-xl border border-slate-200 bg-slate-50 px-3.5 py-2 text-xs font-bold text-slate-900 transition hover:border-blue-300 hover:bg-white"
+            >
+              View All
+            </Link>
           </div>
-        ) : (
-          <>
-            {/* ── KPI Cards ─────────────────────────────────────── */}
-            <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
 
-              {/* Revenue */}
-              <div className="relative overflow-hidden rounded-2xl border border-stone-200 bg-white p-5 shadow-sm">
-                <div className="absolute -right-4 -top-4 h-20 w-20 rounded-full bg-emerald-50 opacity-60" />
-                <div className="flex items-center justify-between">
-                  <span className="text-xs font-semibold uppercase tracking-wide text-stone-500">
-                    Collected Revenue
-                  </span>
-                  <div className="rounded-xl bg-emerald-50 p-2.5 text-emerald-600">
-                    <DollarSign className="h-4 w-4" />
-                  </div>
-                </div>
-                <p className="kpi-value mt-3 text-2xl font-bold text-emerald-600">
-                  ₱{animRevenue.toLocaleString()}
-                </p>
-                <p className="mt-1 text-xs text-stone-400">
-                  Unpaid: ₱{Number(summary.pending_balance || 0).toLocaleString()}
-                </p>
-              </div>
-
-              {/* Queue */}
-              <div className="relative overflow-hidden rounded-2xl border border-stone-200 bg-white p-5 shadow-sm">
-                <div className="absolute -right-4 -top-4 h-20 w-20 rounded-full bg-amber-50 opacity-60" />
-                <div className="flex items-center justify-between">
-                  <span className="text-xs font-semibold uppercase tracking-wide text-stone-500">
-                    Active & Pending
-                  </span>
-                  <div className="rounded-xl bg-amber-50 p-2.5 text-amber-500">
-                    <Clock className="h-4 w-4" />
-                  </div>
-                </div>
-                <p className="kpi-value mt-3 text-2xl font-bold text-stone-900">{animQueue}</p>
-                <p className="mt-1 text-xs text-stone-400">
-                  {summary.pending_requests || 0} new · {summary.scheduled_visits || 0} scheduled
-                </p>
-              </div>
-
-              {/* Completed */}
-              <div className="relative overflow-hidden rounded-2xl border border-stone-200 bg-white p-5 shadow-sm">
-                <div className="absolute -right-4 -top-4 h-20 w-20 rounded-full bg-teal-50 opacity-70" />
-                <div className="flex items-center justify-between">
-                  <span className="text-xs font-semibold uppercase tracking-wide text-stone-500">
-                    Completed Repairs
-                  </span>
-                  <div className="rounded-xl bg-teal-50 p-2.5 text-teal-600">
-                    <CheckCircle2 className="h-4 w-4" />
-                  </div>
-                </div>
-                <p className="kpi-value mt-3 text-2xl font-bold text-teal-700">
-                  {animCompleted}{' '}
-                  <span className="text-xs font-medium text-stone-400">({completionRate}%)</span>
-                </p>
-                <p className="mt-1 text-xs text-stone-400">
-                  {summary.cancelled_requests || 0} cancelled · {totalTickets} total
-                </p>
-              </div>
-
-              {/* Customers */}
-              <div className="relative overflow-hidden rounded-2xl border border-stone-200 bg-white p-5 shadow-sm">
-                <div className="absolute -right-4 -top-4 h-20 w-20 rounded-full bg-teal-50 opacity-50" />
-                <div className="flex items-center justify-between">
-                  <span className="text-xs font-semibold uppercase tracking-wide text-stone-500">
-                    Registered Clients
-                  </span>
-                  <div className="rounded-xl bg-teal-50 p-2.5 text-teal-500">
-                    <Users className="h-4 w-4" />
-                  </div>
-                </div>
-                <p className="kpi-value mt-3 text-2xl font-bold text-stone-900">{animCustomers}</p>
-                <p className="mt-1 text-xs text-stone-400">Active household accounts</p>
-              </div>
-            </div>
-
-            {/* ── Charts Row ────────────────────────────────────── */}
-            <div className="grid grid-cols-1 gap-6 lg:grid-cols-3">
-
-              {/* Area Chart: Monthly Revenue */}
-              <div className="rounded-2xl border border-stone-200 bg-white p-6 shadow-sm lg:col-span-2">
-                <div className="mb-5 flex items-center justify-between">
-                  <div className="flex items-center gap-2">
-                    <div className="rounded-lg bg-teal-50 p-1.5 text-teal-600">
-                      <TrendingUp className="h-4 w-4" />
-                    </div>
-                    <span className="text-sm font-bold text-stone-900">Monthly Collected Revenue</span>
-                  </div>
-                  <span className="text-xs text-stone-400">PHP (₱)</span>
-                </div>
-
-                {areaData.length === 0 ? (
-                  <div className="flex h-48 items-center justify-center rounded-xl bg-stone-50 text-xs text-stone-400">
-                    No payment data for the selected period.
-                  </div>
+          <div className="mt-3 overflow-x-auto">
+            <table className="w-full border-collapse text-left">
+              <thead>
+                <tr className="border-b border-slate-100 text-[10px] font-extrabold uppercase tracking-wider text-slate-400">
+                  <th className="py-3 pr-4">Ticket</th>
+                  <th className="px-4 py-3">Customer</th>
+                  <th className="px-4 py-3">Appliance</th>
+                  <th className="px-4 py-3">Status</th>
+                  <th className="px-4 py-3">Quoted Fee</th>
+                  <th className="pl-4 py-3 text-right">Preferred Date</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-slate-100 text-xs">
+                {loading ? (
+                  <tr>
+                    <td colSpan={6} className="py-8 text-center text-slate-400">
+                      Syncing dashboard records...
+                    </td>
+                  </tr>
+                ) : requests.length === 0 ? (
+                  <tr>
+                    <td colSpan={6} className="py-8 text-center text-slate-400">
+                      No repair requests found.
+                    </td>
+                  </tr>
                 ) : (
-                  <ResponsiveContainer width="100%" height={200}>
-                    <AreaChart data={areaData} margin={{ top: 5, right: 10, left: 0, bottom: 0 }}>
-                      <defs>
-                        <linearGradient id="tealGrad" x1="0" y1="0" x2="0" y2="1">
-                          <stop offset="5%" stopColor="#0d9488" stopOpacity={0.25} />
-                          <stop offset="95%" stopColor="#0d9488" stopOpacity={0} />
-                        </linearGradient>
-                      </defs>
-                      <CartesianGrid strokeDasharray="3 3" stroke="#f1f5f4" vertical={false} />
-                      <XAxis
-                        dataKey="name"
-                        tick={{ fontSize: 11, fill: '#78716c' }}
-                        axisLine={false}
-                        tickLine={false}
-                      />
-                      <YAxis
-                        tick={{ fontSize: 11, fill: '#78716c' }}
-                        axisLine={false}
-                        tickLine={false}
-                        tickFormatter={(v) => `₱${v.toLocaleString()}`}
-                        width={72}
-                      />
-                      <Tooltip content={<RevenueTooltip />} />
-                      <Area
-                        type="monotone"
-                        dataKey="revenue"
-                        stroke="#0d9488"
-                        strokeWidth={2.5}
-                        fill="url(#tealGrad)"
-                        dot={{ fill: '#0d9488', r: 4, strokeWidth: 0 }}
-                        activeDot={{ r: 6, fill: '#0d9488', strokeWidth: 2, stroke: '#fff' }}
-                        animationDuration={1000}
-                      />
-                    </AreaChart>
-                  </ResponsiveContainer>
-                )}
-              </div>
-
-              {/* Horizontal Bar Chart: Appliance Demand */}
-              <div className="rounded-2xl border border-stone-200 bg-white p-6 shadow-sm">
-                <div className="mb-5 flex items-center gap-2">
-                  <div className="rounded-lg bg-teal-50 p-1.5 text-teal-600">
-                    <BarChart2 className="h-4 w-4" />
-                  </div>
-                  <span className="text-sm font-bold text-stone-900">Demand by Appliance</span>
-                </div>
-
-                {barData.length === 0 ? (
-                  <p className="text-xs text-stone-400">No repair requests in this range.</p>
-                ) : (
-                  <ResponsiveContainer width="100%" height={200}>
-                    <BarChart
-                      layout="vertical"
-                      data={barData}
-                      margin={{ top: 0, right: 32, left: 0, bottom: 0 }}
+                  requests.slice(0, 6).map((r) => (
+                    <tr
+                      key={r.request_id || r.id}
+                      className="transition-colors hover:bg-slate-50/80"
                     >
-                      <XAxis type="number" hide />
-                      <YAxis
-                        dataKey="name"
-                        type="category"
-                        width={110}
-                        tick={{ fontSize: 11, fill: '#78716c' }}
-                        axisLine={false}
-                        tickLine={false}
-                      />
-                      <Tooltip
-                        formatter={(v, _, props) => [`${v} tickets (${props.payload.pct}%)`, 'Requests']}
-                        contentStyle={{ fontSize: 12, borderRadius: 10, border: '1px solid #e7e5e4' }}
-                      />
-                      <Bar dataKey="count" radius={[0, 6, 6, 0]} animationDuration={800}>
-                        {barData.map((entry, index) => (
-                          <Cell key={index} fill={entry.color} />
-                        ))}
-                        <LabelList
-                          dataKey="count"
-                          position="right"
-                          style={{ fontSize: 11, fontWeight: 600, fill: '#44403c' }}
-                        />
-                      </Bar>
-                    </BarChart>
-                  </ResponsiveContainer>
+                      <td className="py-3.5 pr-4 font-bold text-slate-950">
+                        #{r.request_id || r.id}
+                      </td>
+                      <td className="px-4 py-3.5 font-semibold text-slate-900">
+                        {r.customer_name || 'Customer'}
+                      </td>
+                      <td className="px-4 py-3.5 text-slate-600">{r.appliance_type}</td>
+                      <td className="px-4 py-3.5">
+                        <span
+                          className={`inline-flex rounded-lg px-2.5 py-1 text-[11px] font-bold ${
+                            r.status === 'Completed'
+                              ? 'bg-emerald-50 text-emerald-700'
+                              : r.status === 'Cancelled'
+                                ? 'bg-rose-50 text-rose-600'
+                                : r.status === 'Pending'
+                                  ? 'bg-amber-50 text-amber-700'
+                                  : 'bg-blue-50 text-blue-700'
+                          }`}
+                        >
+                          {r.status}
+                        </span>
+                      </td>
+                      <td className="px-4 py-3.5 font-semibold text-slate-700">
+                        {r.estimated_cost ? formatPHP(r.estimated_cost) : 'Pending Quote'}
+                      </td>
+                      <td className="pl-4 py-3.5 text-right text-slate-500">
+                        {r.preferred_date
+                          ? new Date(r.preferred_date).toLocaleDateString()
+                          : 'Flexible'}
+                      </td>
+                    </tr>
+                  ))
                 )}
-              </div>
-            </div>
-
-            {/* ── Quick Links Row ───────────────────────────────── */}
-            <div className="grid grid-cols-2 gap-4 sm:grid-cols-4">
-              {[
-                { label: 'Service Requests', to: '/admin/requests', icon: Wrench, color: 'teal' },
-                { label: 'Customers', to: '/admin/customers', icon: Users, color: 'teal' },
-                { label: 'Payments', to: '/admin/payments', icon: DollarSign, color: 'emerald' },
-                { label: 'Activity Logs', to: '/admin/activity-logs', icon: Clock, color: 'stone' },
-              ].map(({ label, to, icon: Icon }) => (
-                <Link
-                  key={to}
-                  to={to}
-                  className="flex items-center gap-3 rounded-2xl border border-stone-200 bg-white px-4 py-3.5 text-sm font-semibold text-stone-700 shadow-sm transition hover:border-teal-300 hover:bg-teal-50/40 hover:text-teal-700"
-                >
-                  <Icon className="h-4 w-4 text-teal-600 shrink-0" />
-                  {label}
-                </Link>
-              ))}
-            </div>
-          </>
-        )}
+              </tbody>
+            </table>
+          </div>
+        </div>
       </div>
     </Layout>
   );

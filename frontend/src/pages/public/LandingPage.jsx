@@ -15,10 +15,12 @@ import {
   Phone,
   MapPin,
   Clock,
+  Star,
 } from 'lucide-react';
 import { useAuth } from '../../context/AuthContext';
 import auseLogo from '../../assets/ause-logo.png';
 import landingPageBg from '../../assets/landingpage-bg.png';
+import api from '../../api/axios';
 
 /* ── Subtle Fade-Up Scroll Animation ───────────────────────────── */
 const Reveal = ({ children, delay = 0, className = '' }) => {
@@ -101,23 +103,47 @@ const LandingPage = () => {
   const [mounted, setMounted] = useState(false);
   const [inquirySent, setInquirySent] = useState(false);
   const [inquiry, setInquiry] = useState({ name: '', email: '', message: '' });
+  const [inquiryError, setInquiryError] = useState('');
+  const [sendingInquiry, setSendingInquiry] = useState(false);
+  const [reviews, setReviews] = useState([]);
 
+  useEffect(() => {
+    api
+      .get('/reviews/public')
+      .then((res) => setReviews(Array.isArray(res.data) ? res.data : []))
+      .catch(() => {});
+  }, []);
+
+  
   useEffect(() => {
     const id = requestAnimationFrame(() => setMounted(true));
     return () => cancelAnimationFrame(id);
   }, []);
 
   const dashboardPath =
-    user?.role === 'admin' ? '/admin/dashboard' : '/customer/dashboard';
+    user?.role === 'admin'
+      ? '/admin/dashboard'
+      : user?.role === 'technician'
+        ? '/technician/jobs'
+        : '/customer/dashboard';
 
-  const handleInquirySubmit = (e) => {
+  const handleInquirySubmit = async (e) => {
     e.preventDefault();
-    setInquirySent(true);
-    setInquiry({ name: '', email: '', message: '' });
+    setInquiryError('');
+    setSendingInquiry(true);
+    try {
+      await api.post('/inquiries', inquiry);
+      setInquirySent(true);
+      setInquiry({ name: '', email: '', message: '' });
+    } catch (err) {
+      setInquiryError(err.response?.data?.message || 'Unable to send message right now.');
+    } finally {
+      setSendingInquiry(false);
+    }
   };
 
   return (
-    <div className="min-h-screen bg-slate-50 text-slate-800 selection:bg-blue-100 selection:text-blue-950">
+    <div className="min-h-screen bg-slate-50 text-slate-800 selection:bg-cyan-100 selection:text-blue-950">
       {/* ── 3-Column Sticky Navbar (Left Logo | Center Links | Right CTA) ── */}
       <header className="sticky top-0 z-30 border-b border-slate-200/70 bg-white/90 backdrop-blur-md">
         <div className="mx-auto grid max-w-6xl grid-cols-2 items-center px-4 py-3.5 sm:px-6 md:grid-cols-3">
@@ -131,7 +157,7 @@ const LandingPage = () => {
                   className="h-9 w-auto object-contain"
                 />
               )}
-              <span className="text-xl font-black tracking-tight text-neutral-950">
+              <span className="text-xl font-black tracking-tight text-slate-950">
                 AUSE
               </span>
             </Link>
@@ -160,7 +186,7 @@ const LandingPage = () => {
             {!user && (
               <Link
                 to="/login"
-                className="text-xs font-bold text-neutral-900 transition hover:text-blue-600"
+                className="text-xs font-bold text-slate-900 transition hover:text-blue-600"
               >
                 Sign In
               </Link>
@@ -179,7 +205,7 @@ const LandingPage = () => {
             )}
             <Link
               to={user ? dashboardPath : '/register'}
-              className="inline-flex items-center gap-1.5 rounded-xl bg-linear-to-r from-blue-700 to-blue-500 px-4 py-2 text-xs font-bold text-white shadow-sm transition hover:from-blue-800 hover:to-blue-600"
+              className="inline-flex items-center gap-1.5 rounded-xl bg-linear-to-r from-blue-600 to-cyan-500 px-4 py-2 text-xs font-bold text-white shadow-sm transition hover:from-blue-700 hover:to-cyan-600"
             >
               {user ? 'Dashboard' : 'Book a Repair'}
               <ArrowRight className="h-3.5 w-3.5" />
@@ -198,7 +224,7 @@ const LandingPage = () => {
               aria-hidden="true"
               className="absolute inset-0 h-full w-full object-cover object-center"
             />
-            <div className="absolute inset-0 bg-linear-to-r from-neutral-950/90 via-blue-950/80 to-blue-800/75" />
+            <div className="absolute inset-0 bg-linear-to-r from-slate-950/90 via-blue-950/85 to-cyan-900/75" />
           </>
         ) : (
           <div className="pointer-events-none absolute -top-32 left-1/2 h-96 w-176 -translate-x-1/2 rounded-full bg-blue-200/40 blur-3xl" />
@@ -217,18 +243,18 @@ const LandingPage = () => {
             }`}
           >
             <Sparkles
-              className={`h-3.5 w-3.5 ${landingPageBg ? 'text-blue-300' : 'text-blue-600'}`}
+              className={`h-3.5 w-3.5 ${landingPageBg ? 'text-cyan-300' : 'text-cyan-600'}`}
             />
             Appliance Utility Service & Engagement
           </div>
 
           <h1
             className={`text-4xl font-extrabold tracking-tight sm:text-6xl sm:leading-[1.12] ${
-              landingPageBg ? 'text-white' : 'text-neutral-950'
+              landingPageBg ? 'text-white' : 'text-slate-950'
             }`}
           >
             Home appliance repair,{' '}
-            <span className={landingPageBg ? 'text-blue-300' : 'text-blue-600'}>
+            <span className={landingPageBg ? 'text-cyan-300' : 'text-blue-600'}>
               quoted transparently.
             </span>
           </h1>
@@ -245,7 +271,7 @@ const LandingPage = () => {
           <div className="mt-8 flex flex-wrap items-center justify-center gap-3">
             <Link
               to={user ? dashboardPath : '/register'}
-              className="group inline-flex items-center gap-2 rounded-xl bg-linear-to-r from-blue-700 to-blue-500 px-7 py-3.5 text-sm font-bold text-white shadow-md shadow-blue-600/20 transition-all hover:-translate-y-0.5 hover:from-blue-800 hover:to-blue-600 hover:shadow-lg"
+              className="group inline-flex items-center gap-2 rounded-xl bg-linear-to-r from-blue-600 to-cyan-500 px-7 py-3.5 text-sm font-bold text-white shadow-md shadow-blue-600/20 transition-all hover:-translate-y-0.5 hover:from-blue-700 hover:to-cyan-600 hover:shadow-lg"
             >
               {user ? 'Open Dashboard' : 'Book a Repair'}
               <ArrowRight className="h-4 w-4 transition-transform group-hover:translate-x-1" />
@@ -256,7 +282,7 @@ const LandingPage = () => {
                 className={`inline-flex items-center gap-2 rounded-xl border px-7 py-3.5 text-sm font-bold transition-all hover:-translate-y-0.5 ${
                   landingPageBg
                     ? 'border-white/30 bg-white/10 text-white backdrop-blur-sm hover:bg-white/20'
-                    : 'border-slate-200 bg-white text-neutral-950 shadow-xs hover:border-blue-300'
+                    : 'border-slate-200 bg-white text-slate-950 shadow-xs hover:border-cyan-300'
                 }`}
               >
                 Track Request
@@ -273,7 +299,7 @@ const LandingPage = () => {
               (item) => (
                 <span key={item} className="inline-flex items-center gap-1.5">
                   <CheckCircle2
-                    className={`h-4 w-4 ${landingPageBg ? 'text-blue-300' : 'text-blue-600'}`}
+                    className={`h-4 w-4 ${landingPageBg ? 'text-cyan-300' : 'text-cyan-600'}`}
                   />
                   {item}
                 </span>
@@ -288,10 +314,10 @@ const LandingPage = () => {
         <div className="mx-auto max-w-6xl px-4 sm:px-6">
           <Reveal>
             <div className="mb-10 text-center">
-              <p className="text-xs font-bold uppercase tracking-widest text-blue-600">
+              <p className="text-xs font-bold uppercase tracking-widest text-cyan-600">
                 Services
               </p>
-              <h2 className="mt-1.5 text-2xl font-extrabold text-neutral-950 sm:text-3xl">
+              <h2 className="mt-1.5 text-2xl font-extrabold text-slate-950 sm:text-3xl">
                 Essential Home Appliances
               </h2>
             </div>
@@ -302,11 +328,11 @@ const LandingPage = () => {
               const Icon = item.icon;
               return (
                 <Reveal key={item.name} delay={idx * 90}>
-                  <div className="group h-full rounded-2xl border border-slate-100 bg-white p-6 shadow-sm transition-all duration-300 hover:-translate-y-1 hover:border-blue-200 hover:shadow-md">
-                    <div className="flex h-11 w-11 items-center justify-center rounded-xl bg-blue-600 text-white shadow-xs transition-transform duration-300 group-hover:scale-105">
+                  <div className="group h-full rounded-2xl border border-slate-100 bg-white p-6 shadow-sm transition-all duration-300 hover:-translate-y-1 hover:border-cyan-200 hover:shadow-md">
+                    <div className="flex h-11 w-11 items-center justify-center rounded-xl bg-linear-to-br from-blue-600 to-cyan-500 text-white shadow-xs transition-transform duration-300 group-hover:scale-105">
                       <Icon className="h-5 w-5" />
                     </div>
-                    <h3 className="mt-5 text-base font-bold text-neutral-950">{item.name}</h3>
+                    <h3 className="mt-5 text-base font-bold text-slate-950">{item.name}</h3>
                     <p className="mt-1.5 text-xs leading-relaxed text-slate-500">{item.desc}</p>
                   </div>
                 </Reveal>
@@ -324,7 +350,7 @@ const LandingPage = () => {
               <p className="text-xs font-bold uppercase tracking-widest text-blue-600">
                 Process
               </p>
-              <h2 className="mt-1.5 text-2xl font-extrabold text-neutral-950 sm:text-3xl">
+              <h2 className="mt-1.5 text-2xl font-extrabold text-slate-950 sm:text-3xl">
                 Three Simple Steps
               </h2>
             </div>
@@ -344,7 +370,7 @@ const LandingPage = () => {
                         {step.num}
                       </span>
                     </div>
-                    <h3 className="mt-4 text-base font-bold text-neutral-950">{step.title}</h3>
+                    <h3 className="mt-4 text-base font-bold text-slate-950">{step.title}</h3>
                     <p className="mt-1.5 text-xs leading-relaxed text-slate-500">{step.desc}</p>
                   </div>
                 </Reveal>
@@ -353,6 +379,54 @@ const LandingPage = () => {
           </div>
         </div>
       </section>
+
+      {/* ── Verified Customer Reviews ─────────────────────────── */}
+      {reviews.length > 0 && (
+        <section className="border-t border-slate-200/70 bg-white py-16">
+          <div className="mx-auto max-w-6xl px-4 sm:px-6">
+            <Reveal>
+              <div className="text-center">
+                <p className="text-xs font-bold uppercase tracking-widest text-blue-600">
+                  Verified Reviews
+                </p>
+                <h2 className="mt-1.5 text-2xl font-extrabold text-slate-950 sm:text-3xl">
+                  Trusted by Metro Manila homeowners
+                </h2>
+              </div>
+            </Reveal>
+
+            <div className="mt-10 grid grid-cols-1 gap-5 md:grid-cols-3">
+              {reviews.map((rv) => (
+                <Reveal key={rv.review_id}>
+                  <div className="flex h-full flex-col justify-between rounded-2xl border border-slate-100 bg-slate-50/70 p-6">
+                    <div>
+                      <div className="flex items-center gap-1">
+                        {[1, 2, 3, 4, 5].map((n) => (
+                          <Star
+                            key={n}
+                            className={`h-4 w-4 ${
+                              n <= rv.rating ? 'fill-amber-400 text-amber-400' : 'text-slate-200'
+                            }`}
+                          />
+                        ))}
+                      </div>
+                      <p className="mt-3 text-xs leading-relaxed text-slate-600">
+                        &ldquo;{rv.comment || 'Great service and prompt repair!'}&rdquo;
+                      </p>
+                    </div>
+                    <div className="mt-4 border-t border-slate-200/70 pt-3">
+                      <p className="text-xs font-bold text-slate-900">{rv.customer_name}</p>
+                      <p className="text-[11px] text-slate-500">
+                        Verified {rv.appliance_type} Repair
+                      </p>
+                    </div>
+                  </div>
+                </Reveal>
+              ))}
+            </div>
+          </div>
+        </section>
+      )}
 
       {/* ── Minimalist Contact & Inquiry Section ────────────────── */}
       <section id="contact" className="py-16">
@@ -365,7 +439,7 @@ const LandingPage = () => {
                   <p className="text-xs font-bold uppercase tracking-widest text-blue-600">
                     Contact
                   </p>
-                  <h2 className="mt-1.5 text-2xl font-extrabold text-neutral-950">
+                  <h2 className="mt-1.5 text-2xl font-extrabold text-slate-950">
                     Questions or feedback?
                   </h2>
                   <p className="mt-2 text-xs leading-relaxed text-slate-500">
@@ -399,7 +473,7 @@ const LandingPage = () => {
                 {inquirySent ? (
                   <div className="flex h-full flex-col items-center justify-center rounded-2xl border border-blue-100 bg-blue-50/50 p-8 text-center">
                     <CheckCircle2 className="h-10 w-10 text-blue-600" />
-                    <h3 className="mt-3 text-base font-bold text-neutral-950">
+                    <h3 className="mt-3 text-base font-bold text-slate-950">
                       Inquiry Received
                     </h3>
                     <p className="mt-1 max-w-sm text-xs text-slate-500">
@@ -427,7 +501,7 @@ const LandingPage = () => {
                           value={inquiry.name}
                           onChange={(e) => setInquiry({ ...inquiry, name: e.target.value })}
                           placeholder="Juan Dela Cruz"
-                          className="w-full rounded-xl border border-slate-200 bg-slate-50 px-3.5 py-2.5 text-xs text-neutral-900 outline-none transition focus:border-blue-600 focus:bg-white"
+                          className="w-full rounded-xl border border-slate-200 bg-slate-50 px-3.5 py-2.5 text-xs text-slate-900 outline-none transition focus:border-blue-600 focus:bg-white"
                         />
                       </div>
                       <div>
@@ -440,7 +514,7 @@ const LandingPage = () => {
                           value={inquiry.email}
                           onChange={(e) => setInquiry({ ...inquiry, email: e.target.value })}
                           placeholder="juan@email.com"
-                          className="w-full rounded-xl border border-slate-200 bg-slate-50 px-3.5 py-2.5 text-xs text-neutral-900 outline-none transition focus:border-blue-600 focus:bg-white"
+                          className="w-full rounded-xl border border-slate-200 bg-slate-50 px-3.5 py-2.5 text-xs text-slate-900 outline-none transition focus:border-blue-600 focus:bg-white"
                         />
                       </div>
                     </div>
@@ -455,7 +529,7 @@ const LandingPage = () => {
                         value={inquiry.message}
                         onChange={(e) => setInquiry({ ...inquiry, message: e.target.value })}
                         placeholder="Ask about an appliance issue, service coverage, or share feedback..."
-                        className="w-full rounded-xl border border-slate-200 bg-slate-50 px-3.5 py-2.5 text-xs text-neutral-900 outline-none transition focus:border-blue-600 focus:bg-white"
+                        className="w-full rounded-xl border border-slate-200 bg-slate-50 px-3.5 py-2.5 text-xs text-slate-900 outline-none transition focus:border-blue-600 focus:bg-white"
                       />
                     </div>
 
@@ -478,7 +552,7 @@ const LandingPage = () => {
       <section className="py-16">
         <Reveal>
           <div className="mx-auto max-w-4xl px-4 sm:px-6">
-            <div className="relative overflow-hidden rounded-3xl bg-linear-to-r from-neutral-950 via-blue-900 to-blue-600 px-6 py-12 text-center text-white shadow-lg shadow-blue-950/15 sm:px-12">
+            <div className="relative overflow-hidden rounded-3xl bg-linear-to-r from-slate-950 via-blue-800 to-cyan-600 px-6 py-12 text-center text-white shadow-lg shadow-blue-950/15 sm:px-12">
               <h2 className="text-2xl font-extrabold sm:text-3xl">
                 Ready to schedule a home visit?
               </h2>
@@ -488,7 +562,7 @@ const LandingPage = () => {
               <div className="mt-7">
                 <Link
                   to={user ? dashboardPath : '/register'}
-                  className="inline-flex items-center gap-2 rounded-xl bg-white px-6 py-3 text-sm font-bold text-neutral-950 shadow-sm transition hover:bg-blue-50"
+                  className="inline-flex items-center gap-2 rounded-xl bg-white px-6 py-3 text-sm font-bold text-slate-950 shadow-sm transition hover:bg-cyan-50"
                 >
                   {user ? 'Go to Dashboard' : 'Get Started'}
                   <ArrowRight className="h-4 w-4 text-blue-600" />
@@ -506,9 +580,6 @@ const LandingPage = () => {
           <div className="flex items-center gap-6 font-semibold text-slate-500">
             <Link to="/legal" className="transition hover:text-blue-600">
               Terms & Conditions
-            </Link>
-            <Link to="/login" className="transition hover:text-blue-600">
-              Portal Sign In
             </Link>
           </div>
         </div>

@@ -2,7 +2,7 @@
 
 @layer base {
   body {
-    @apply bg-stone-100 text-stone-800 antialiased;
+    @apply bg-slate-50 text-slate-800 antialiased selection:bg-cyan-100 selection:text-blue-950;
     font-family: 'Plus Jakarta Sans', 'Inter', system-ui, -apple-system, sans-serif;
   }
 }
@@ -33,14 +33,14 @@
   animation: countUp 0.5s ease-out both;
 }
 
-/* ── Teal scrollbar ─────────────────────────────────────────── */
+/* ── Blue + Cyan scrollbar ──────────────────────────────────── */
 ::-webkit-scrollbar { width: 6px; height: 6px; }
 ::-webkit-scrollbar-track { background: transparent; }
 ::-webkit-scrollbar-thumb {
-  background: #99f6e4;
+  background: #bae6fd;
   border-radius: 999px;
 }
-::-webkit-scrollbar-thumb:hover { background: #2dd4bf; }
+::-webkit-scrollbar-thumb:hover { background: #06b6d4; }
 
 @media print {
   aside,

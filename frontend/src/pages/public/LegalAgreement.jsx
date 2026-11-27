@@ -3,12 +3,12 @@ import { ArrowLeft, Wrench, Printer } from 'lucide-react';
 
 const LegalAgreement = () => {
   return (
-    <div className="min-h-screen bg-stone-100 px-4 py-8 sm:px-6">
+    <div className="min-h-screen bg-slate-100 px-4 py-8 sm:px-6">
       <div className="mx-auto max-w-4xl space-y-6">
         <div className="no-print flex items-center justify-between">
           <Link
             to="/"
-            className="inline-flex items-center gap-1.5 text-xs font-semibold text-stone-600 hover:text-stone-900"
+            className="inline-flex items-center gap-1.5 text-xs font-semibold text-slate-600 hover:text-slate-900"
           >
             <ArrowLeft className="h-4 w-4" />
             Back to AUSE Home
@@ -16,35 +16,35 @@ const LegalAgreement = () => {
 
           <button
             onClick={() => window.print()}
-            className="inline-flex items-center gap-1.5 rounded-lg border border-stone-300 bg-white px-3.5 py-1.5 text-xs font-semibold text-stone-700 shadow-sm hover:bg-stone-50"
+            className="inline-flex items-center gap-1.5 rounded-lg border border-slate-300 bg-white px-3.5 py-1.5 text-xs font-semibold text-slate-700 shadow-sm hover:bg-slate-50"
           >
             <Printer className="h-3.5 w-3.5" />
             Print Terms
           </button>
         </div>
 
-        <div className="rounded-3xl border border-stone-200 bg-white p-6 shadow-sm sm:p-10">
-          <div className="flex items-center gap-3 border-b border-stone-200 pb-6">
-            <div className="flex h-11 w-11 items-center justify-center rounded-2xl bg-teal-600 text-white">
+        <div className="rounded-3xl border border-slate-200 bg-white p-6 shadow-sm sm:p-10">
+          <div className="flex items-center gap-3 border-b border-slate-200 pb-6">
+            <div className="flex h-11 w-11 items-center justify-center rounded-2xl bg-blue-600 text-white">
               <Wrench className="h-5 w-5" />
             </div>
             <div>
-              <p className="text-xs font-bold uppercase tracking-wider text-teal-600">
+              <p className="text-xs font-bold uppercase tracking-wider text-blue-600">
                 AUSE Home Appliance Services
               </p>
-              <h1 className="text-xl font-extrabold text-stone-900 sm:text-2xl">
+              <h1 className="text-xl font-extrabold text-slate-900 sm:text-2xl">
                 Terms & Conditions and Customer Service Agreement
               </h1>
             </div>
           </div>
 
-          <div className="mt-6 space-y-5 text-sm leading-relaxed text-stone-700">
-            <p className="text-xs text-stone-400">
+          <div className="mt-6 space-y-5 text-sm leading-relaxed text-slate-700">
+            <p className="text-xs text-slate-400">
               Effective Date: November 1, 2026 • Last Updated: November 2026
             </p>
 
             <section className="space-y-2">
-              <h2 className="text-base font-bold text-stone-900">1. Acceptance of Terms</h2>
+              <h2 className="text-base font-bold text-slate-900">1. Acceptance of Terms</h2>
               <p>
                 By registering an account or submitting a home-appliance repair request
                 through the <strong>AUSE (Appliance Utility Service & Engagement)</strong>{' '}
@@ -53,7 +53,7 @@ const LegalAgreement = () => {
             </section>
 
             <section className="space-y-2">
-              <h2 className="text-base font-bold text-stone-900">
+              <h2 className="text-base font-bold text-slate-900">
                 2. Diagnosis & Repair Quotations
               </h2>
               <p>
@@ -67,7 +67,7 @@ const LegalAgreement = () => {
             </section>
 
             <section className="space-y-2">
-              <h2 className="text-base font-bold text-stone-900">
+              <h2 className="text-base font-bold text-slate-900">
                 3. Home-Service Scheduling & Cancellations
               </h2>
               <p>
@@ -79,7 +79,7 @@ const LegalAgreement = () => {
             </section>
 
             <section className="space-y-2">
-              <h2 className="text-base font-bold text-stone-900">
+              <h2 className="text-base font-bold text-slate-900">
                 4. Billing, Payment & 30-Day Service Warranty
               </h2>
               <p>
@@ -92,7 +92,7 @@ const LegalAgreement = () => {
             </section>
 
             <section className="space-y-2">
-              <h2 className="text-base font-bold text-stone-900">
+              <h2 className="text-base font-bold text-slate-900">
                 5. Data Privacy & Activity Logging
               </h2>
               <p>

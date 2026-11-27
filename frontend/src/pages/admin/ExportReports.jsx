@@ -101,12 +101,12 @@ const ExportReports = () => {
         <div className="flex flex-col justify-between gap-4 lg:flex-row lg:items-center">
           <div>
             <div className="flex items-center gap-2.5">
-              <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-teal-50 text-teal-600">
+              <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-blue-50 text-blue-600">
                 <FileBarChart2 className="h-5 w-5" />
               </div>
-              <h1 className="text-2xl font-bold text-stone-900">Reports & Export</h1>
+              <h1 className="text-2xl font-extrabold tracking-tight text-slate-900">Reports & Export</h1>
             </div>
-            <p className="mt-1 text-sm text-stone-500 ml-11">
+            <p className="mt-1 text-sm text-slate-500 ml-11">
               Filterable consolidated service and billing records. Export as CSV or print.
             </p>
           </div>
@@ -114,14 +114,14 @@ const ExportReports = () => {
           <div className="no-print flex flex-wrap gap-2.5">
             <button
               onClick={handleExportCSV}
-              className="inline-flex items-center gap-2 rounded-xl bg-teal-600 px-4 py-2.5 text-sm font-semibold text-white shadow-sm hover:bg-teal-700 transition-colors"
+              className="inline-flex items-center gap-2 rounded-xl bg-blue-600 px-4 py-2.5 text-sm font-semibold text-white shadow-sm hover:bg-blue-700 transition-colors"
             >
               <Download className="h-4 w-4" />
               Export CSV
             </button>
             <button
               onClick={() => window.print()}
-              className="inline-flex items-center gap-2 rounded-xl border border-stone-200 bg-white px-4 py-2.5 text-sm font-semibold text-stone-700 shadow-sm hover:bg-stone-50 transition-colors"
+              className="inline-flex items-center gap-2 rounded-xl border border-slate-200 bg-white px-4 py-2.5 text-sm font-semibold text-slate-700 shadow-sm hover:bg-slate-50 transition-colors"
             >
               <Printer className="h-4 w-4" />
               Print Report
@@ -130,18 +130,18 @@ const ExportReports = () => {
         </div>
 
         {/* ── Filter Bar ────────────────────────────────────────── */}
-        <div className="no-print flex flex-wrap items-end gap-3 rounded-2xl border border-stone-200 bg-white p-4 shadow-sm">
-          <div className="flex items-center gap-1.5 text-xs font-bold uppercase tracking-wide text-stone-500 sm:mr-2 sm:self-center">
-            <Filter className="h-4 w-4 text-teal-600" />
+        <div className="no-print flex flex-wrap items-end gap-3 rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
+          <div className="flex items-center gap-1.5 text-xs font-bold uppercase tracking-wide text-slate-500 sm:mr-2 sm:self-center">
+            <Filter className="h-4 w-4 text-blue-600" />
             Filter:
           </div>
 
           <div>
-            <label className="mb-1 block text-[11px] font-semibold text-stone-500">Year</label>
+            <label className="mb-1 block text-[11px] font-semibold text-slate-500">Year</label>
             <select
               value={selectedYear}
               onChange={(e) => setSelectedYear(e.target.value)}
-              className="rounded-xl border border-stone-300 bg-white px-3 py-2 text-xs font-medium text-stone-700 focus:border-teal-600 focus:outline-none"
+              className="rounded-xl border border-slate-300 bg-white px-3 py-2 text-xs font-medium text-slate-700 focus:border-blue-600 focus:outline-none"
             >
               <option value="ALL">All Years</option>
               <option value="2026">2026</option>
@@ -150,65 +150,65 @@ const ExportReports = () => {
           </div>
 
           <div>
-            <label className="mb-1 block text-[11px] font-semibold text-stone-500">From Date</label>
+            <label className="mb-1 block text-[11px] font-semibold text-slate-500">From Date</label>
             <input
               type="date"
               value={startDate}
               onChange={(e) => setStartDate(e.target.value)}
-              className="rounded-xl border border-stone-300 px-3 py-2 text-xs text-stone-700 focus:border-teal-600 focus:outline-none"
+              className="rounded-xl border border-slate-300 px-3 py-2 text-xs text-slate-700 focus:border-blue-600 focus:outline-none"
             />
           </div>
 
           <div>
-            <label className="mb-1 block text-[11px] font-semibold text-stone-500">To Date</label>
+            <label className="mb-1 block text-[11px] font-semibold text-slate-500">To Date</label>
             <input
               type="date"
               value={endDate}
               onChange={(e) => setEndDate(e.target.value)}
-              className="rounded-xl border border-stone-300 px-3 py-2 text-xs text-stone-700 focus:border-teal-600 focus:outline-none"
+              className="rounded-xl border border-slate-300 px-3 py-2 text-xs text-slate-700 focus:border-blue-600 focus:outline-none"
             />
           </div>
 
           {hasFilters && (
             <button
               onClick={handleResetFilters}
-              className="inline-flex items-center gap-1.5 rounded-xl border border-stone-300 px-3 py-2 text-xs font-semibold text-stone-600 hover:bg-stone-50"
+              className="inline-flex items-center gap-1.5 rounded-xl border border-slate-300 px-3 py-2 text-xs font-semibold text-slate-600 hover:bg-slate-50"
             >
               <RotateCcw className="h-3.5 w-3.5" />
               Reset
             </button>
           )}
 
-          <span className="ml-auto self-center text-xs text-stone-400">
+          <span className="ml-auto self-center text-xs text-slate-400">
             {!loading && `${reportRows.length} records`}
           </span>
         </div>
 
         {/* ── Report Table ──────────────────────────────────────── */}
-        <div className="overflow-hidden rounded-2xl border border-stone-200 bg-white shadow-sm">
-          <div className="flex flex-wrap items-center justify-between gap-2 border-b border-stone-200 px-6 py-4">
-            <div className="flex items-center gap-2 text-sm font-bold text-stone-900">
-              <Wrench className="h-4 w-4 text-teal-600" />
+        <div className="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm">
+          <div className="flex flex-wrap items-center justify-between gap-2 border-b border-slate-200 px-6 py-4">
+            <div className="flex items-center gap-2 text-sm font-bold text-slate-900">
+              <Wrench className="h-4 w-4 text-blue-600" />
               Consolidated Service & Billing Report
             </div>
-            <span className="text-xs text-stone-400">
+            <span className="text-xs text-slate-400">
               Joined across Repair Requests, Clients & Payments
             </span>
           </div>
 
           {loading ? (
             <div className="flex h-52 items-center justify-center">
-              <Loader2 className="h-7 w-7 animate-spin text-teal-600" />
+              <Loader2 className="h-7 w-7 animate-spin text-blue-600" />
             </div>
           ) : reportRows.length === 0 ? (
             <div className="flex flex-col items-center justify-center gap-2 py-14">
-              <FileBarChart2 className="h-10 w-10 text-stone-200" />
-              <p className="text-sm text-stone-400">No records match the selected filter.</p>
+              <FileBarChart2 className="h-10 w-10 text-slate-200" />
+              <p className="text-sm text-slate-400">No records match the selected filter.</p>
             </div>
           ) : (
             <div className="overflow-x-auto">
               <table className="w-full border-collapse text-left text-xs">
-                <thead className="border-b border-stone-200 bg-stone-50 font-semibold uppercase text-stone-500">
+                <thead className="border-b border-slate-200 bg-slate-50 font-semibold uppercase text-slate-500">
                   <tr>
                     <th className="px-4 py-3.5">Ticket Ref</th>
                     <th className="px-4 py-3.5">Date</th>
@@ -220,23 +220,23 @@ const ExportReports = () => {
                     <th className="px-4 py-3.5">Billing</th>
                   </tr>
                 </thead>
-                <tbody className="divide-y divide-stone-100">
+                <tbody className="divide-y divide-slate-100">
                   {reportRows.map((row) => (
-                    <tr key={row.ticket_reference} className="transition hover:bg-teal-50/30">
-                      <td className="px-4 py-3 font-bold text-teal-700">
+                    <tr key={row.ticket_reference} className="transition hover:bg-blue-50/30">
+                      <td className="px-4 py-3 font-bold text-blue-700">
                         #{row.ticket_reference}
                       </td>
-                      <td className="px-4 py-3 text-stone-500">{row.date_requested}</td>
-                      <td className="px-4 py-3 font-medium text-stone-800">
+                      <td className="px-4 py-3 text-slate-500">{row.date_requested}</td>
+                      <td className="px-4 py-3 font-medium text-slate-800">
                         {row.client_full_name}
                       </td>
-                      <td className="px-4 py-3 text-stone-600">{row.appliance_category}</td>
+                      <td className="px-4 py-3 text-slate-600">{row.appliance_category}</td>
                       <td className="px-4 py-3">
-                        <span className="rounded-full bg-stone-100 px-2 py-0.5 text-[11px] font-semibold text-stone-700">
+                        <span className="rounded-full bg-slate-100 px-2 py-0.5 text-[11px] font-semibold text-slate-700">
                           {row.repair_stage}
                         </span>
                       </td>
-                      <td className="px-4 py-3 text-stone-700">
+                      <td className="px-4 py-3 text-slate-700">
                         ₱{Number(row.quoted_fee).toLocaleString()}
                       </td>
                       <td className="px-4 py-3 font-semibold text-emerald-600">
@@ -249,7 +249,7 @@ const ExportReports = () => {
                               ? 'bg-emerald-100 text-emerald-700'
                               : row.billing_status === 'Partial'
                                 ? 'bg-amber-100 text-amber-700'
-                                : 'bg-stone-100 text-stone-600'
+                                : 'bg-slate-100 text-slate-600'
                           }`}
                         >
                           {row.billing_status}

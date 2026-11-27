@@ -4,13 +4,19 @@ const cors = require('cors');
 const path = require('path');
 require('dotenv').config();
 
-// Initialize DB connection
+// Initialize DB connection & Phase 2 schema
 require('./config/db');
+const { initPhase2Schema } = require('./config/initDb');
+initPhase2Schema();
 
 // Import Routes
 const authRoutes = require('./routes/authRoutes');
-const requestRoutes = require('./routes/requestRoutes'); 
-const adminRoutes = require('./routes/adminRoutes');     
+const requestRoutes = require('./routes/requestRoutes');
+const adminRoutes = require('./routes/adminRoutes');
+const inquiryRoutes = require('./routes/inquiryRoutes');
+const technicianRoutes = require('./routes/technicianRoutes');
+const reviewRoutes = require('./routes/reviewRoutes');
+const applianceRoutes = require('./routes/applianceRoutes');
 
 const app = express();
 
@@ -29,8 +35,12 @@ app.get('/api/health', (req, res) => {
 
 // Mount API Routes
 app.use('/api/auth', authRoutes);
-app.use('/api/requests', requestRoutes); 
-app.use('/api/admin', adminRoutes);       
+app.use('/api/requests', requestRoutes);
+app.use('/api/admin', adminRoutes);
+app.use('/api/inquiries', inquiryRoutes);
+app.use('/api/technician', technicianRoutes);
+app.use('/api/reviews', reviewRoutes);
+app.use('/api/appliances', applianceRoutes);
 
 // Global error handler
 app.use((err, req, res, next) => {
